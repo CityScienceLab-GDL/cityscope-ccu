@@ -2,6 +2,7 @@
 * Name: filesvalidator
 * Based on the internal empty template. 
 * Author: gamaa
+* Co-Author: juan alvarez 
 * Tags: 
 */
 
@@ -9,8 +10,7 @@
 model CityScope
 import "constants.gaml"
 
-
-global{
+global skills:[network]{
 	
 	//Shape files
 	
@@ -89,6 +89,9 @@ global{
 
 	
 	init{
+		//Initialize MQTT connection
+		write "Initializing mqtt connection";		
+		do connect to:"localhost" with_name:"cityscope_table";
 		
 		//Simulation specific variables
 		step 					<- 5#seconds;
@@ -198,10 +201,21 @@ global{
 	float dash_knowledge_activities_diversity;
 	//FUNCTIONALITY
 	
+	// MQTT MESAGGES MANAGEMENT
+	*/
+	reflex receiveAgent when:has_more_message(){
+		write "fetch agent on the network";
+		message mess <- fetch_message();
+		write name + " fecth this message: " + mess.contents;	
+		if mess.contents = "1/A"{
+			scenario <- "A";
+		}
+		if mess.contents = "1/B"{
+			scenario <- "B";
+		}
+	}
+
 	//ENVIRONMENTAL IMPACT
-	
-	 * 
-	 */
 	reflex compute_export_data when:allow_export_data{
 		//Some of the values that are exported by this funcion are computed in other functions.
 		
@@ -591,7 +605,6 @@ grid heatmap width:world.shape.width/15 height:world.shape.height/15{
 }
 
 //------------------ SPECIES -----------------------------------------------------
-
 //Species related to transportation
 species transport_station{
 	string type;
