@@ -1,8 +1,6 @@
 /**
 * Name: basemodel
-* Based on the internal empty template. 
 * Author: Gamaliel Palomo
-* Tags: 
 */
 
 model basemodel
@@ -19,8 +17,8 @@ global {
 	graph roads_network;
 	graph raw_network;
 	
-	string raw_path <- "../includes/shp/scenario1/roads.shp";
-	string clean_path <- "../includes/shp/scenario1/roads_clean.shp";
+	string raw_path <- "../includes/shp/ccu/roads.shp";
+	string clean_path <- "../includes/shp/ccu/roads_clean.shp";
 	shape_file roads_file <- shape_file(file_exists(clean_path) ? clean_path : raw_path);
 	geometry shape <- envelope(roads_file);
 	
@@ -31,18 +29,30 @@ global {
 			do printLog("Cached clean network found: " + clean_path);
 			do printLog("Loading road agents directly from clean file...");
 			
-			// Cargar agentes 'road' manteniendo la dirección guardada
-			create road from: shape_file(clean_path) with: [direccion :: string(read("direccion"))];
+			// Cargar agentes 'road' manteniendo la dirección y el número de carriles guardados
+			create road from: shape_file(clean_path) with: [
+				direccion :: string(read("direccion")),
+				lanes :: int(read("lanes"))
+			];
 			do printLog("Road agents loaded: " + length(road));
 		} 
 		else {
 			do printLog("Clean network NOT found. Processing raw file...");
 			shape_file raw_file <- shape_file(raw_path);
 			
-			// 1. Cargar agentes leyendo el atributo 'direccion'
-			create road from: raw_file with: [direccion :: string(read("direccion"))];
+			// 1. Cargar agentes leyendo 'direccion', 'highway' y 'other_tags'
+			create road from: raw_file with: [
+				direccion :: string(read("direccion")),
+				highway :: string(read("highway")),
+				other_tags :: string(read("other_tags"))
+			];
 			
-			// 2. BLOQUE DE INSPECCIÓN: Muestra frecuencias en consola
+			// 2. Extraer y calcular los carriles para cada tramo
+			ask road {
+				do calculate_lanes;
+			}
+			
+			// 3. BLOQUE DE INSPECCIÓN: Muestra frecuencias en consola
 			list<string> valores_unicos <- remove_duplicates(road collect each.direccion);
 			write "==================================================";
 			write " INSPECCIÓN DEL CAMPO 'direccion' EN EL SHAPEFILE:";
@@ -52,41 +62,56 @@ global {
 			loop val over: conteo_por_valor.keys {
 				write "  -> Valor '" + val + "': " + length(conteo_por_valor[val]) + " tramos";
 			}
+			
+			map<int, list<road>> conteo_carriles <- road group_by (each.lanes);
+			write " INSPECCIÓN DE CARRILES DETECTADOS:";
+			loop l_val over: conteo_carriles.keys {
+				write "  -> " + l_val + " carril(es): " + length(conteo_carriles[l_val]) + " tramos";
+			}
 			write "==================================================";
 			
-			// 3. Invertir geometrías de las calles de un solo sentido opuesto ('3' o '2')
+			// 4. Invertir geometrías de las calles de un solo sentido opuesto ('3', '2' o '-1')
 			ask road where (each.direccion = "3" or each.direccion = "2" or each.direccion = "-1") {
 				shape <- reverse(self.shape);
 			}
 			
-			// 4. Duplicar aristas para calles de DOBLE SENTIDO ('1', '' o nil)
+			// 5. Duplicar aristas para calles de DOBLE SENTIDO ('1', '' o nil) conservando 'lanes'
 			ask road where (each.direccion = "1" or empty(each.direccion) or each.direccion = nil) {
 				create road {
 					shape <- reverse(myself.shape);
 					direccion <- myself.direccion;
+					lanes <- myself.lanes;
+					highway <- myself.highway;
 				}
 			}
 			
 			do printLog("Total de tramos tras orientación/duplicación: " + length(road));
 			
-			// 5. Unir nodos e intersecciones aumentando la tolerancia a 10.0 metros
+			// 6. Unir nodos e intersecciones aumentando la tolerancia
 			do printLog("Cleaning network topology and connecting intersections...");
 			list<geometry> clean_geoms <- clean_network(road collect each.shape, 12.0, true, true);
 			
-			// Recrear los agentes road consolidando las geometrías limpias
-			ask road { do die; }
-			create road from: clean_geoms;
+			// Recrear los agentes road heredando atributos (direccion y lanes) de los tramos originales
+			list<road> original_roads <- copy(road);
+			create road from: clean_geoms {
+				road closest_orig <- original_roads closest_to self;
+				if (closest_orig != nil) {
+					self.direccion <- closest_orig.direccion;
+					self.lanes <- closest_orig.lanes;
+				}
+			}
+			ask original_roads { do die; }
 			
-			// 6. Guardar el Shapefile procesado con sentido y topología limpia
-			do printLog("Saving processed network to: " + clean_path);
-			save road to: clean_path format: "shp" crs: "EPSG:4326";
+			// 7. Guardar el Shapefile procesado EXPLICITANDO LOS ATRIBUTOS 'direccion' Y 'lanes'
+			do printLog("Saving processed network with lanes to: " + clean_path);
+			save road to: clean_path format: "shp" attributes: ["direccion"::direccion, "lanes"::lanes] crs: "EPSG:4326";
 			do printLog("Clean Shapefile saved successfully.");
 		}
 		
-		// 7. Construir el Grafo Dirigido
+		// 8. Construir el Grafo Dirigido
 		graph full_graph <- directed(as_edge_graph(road));
 		
-		// Podar nodos "sumidero" y "fuente" (sin salida o sin entrada en la red dirigida)
+		// Podar nodos "sumidero" y "fuente"
 		list valid_nodes <- full_graph.vertices select (
 			in_degree_of(full_graph, each) > 0 and out_degree_of(full_graph, each) > 0
 		);
@@ -96,7 +121,6 @@ global {
 			valid_nodes contains target_of(full_graph, each)
 		);
 		
-		// Grafo final 100% navegable
 		roads_network <- directed(as_edge_graph(navigable_roads));
 		
 		do color_graph_components(roads_network);
@@ -111,10 +135,7 @@ global {
 	}
 
 	reflex evolution {
-		// ask all cells to decrease their level of pollution
 		cell <- cell * 0.8;
-	
-		// diffuse the pollutions to neighbor cells
 		diffuse var: hazard on: cell proportion: 0.5;
 	}
 
@@ -296,16 +317,54 @@ species graphnode mirrors: people {
 
 species road {
 	string direccion <- "";
+	string highway <- "";
+	string other_tags <- "";
+	int lanes <- 1;
+	
 	int component_id <- 0;
 	rgb color_component <- #black;
 	int line_width <- 2;
 	
+	action calculate_lanes {
+		if (lanes > 1) { return; }
+		
+		// 1. Extraer etiqueta 'lanes' de other_tags usando split_with
+		if (other_tags != nil and other_tags contains "lanes") {
+			list<string> parts <- other_tags split_with "\"lanes\"=>\"";
+			if (length(parts) > 1) {
+				string lane_str <- (parts[1] split_with "\"") at 0;
+				if (lane_str != nil and lane_str != "") {
+					lanes <- int(lane_str);
+					if (lanes > 0) { return; }
+				}
+			}
+		}
+		
+		// 2. Mapeo según la jerarquía 'highway'
+		if (highway != nil and highway != "") {
+			switch highway {
+				match "motorway"      { lanes <- 3; }
+				match "trunk"         { lanes <- 3; }
+				match "motorway_link" { lanes <- 2; }
+				match "primary"       { lanes <- 2; }
+				match "primary_link"  { lanes <- 2; }
+				match "secondary"     { lanes <- 2; }
+				match "secondary_link"{ lanes <- 1; }
+				match "tertiary"      { lanes <- 1; }
+				match "residential"   { lanes <- 1; }
+				match "service"       { lanes <- 1; }
+				default               { lanes <- 1; }
+			}
+		} else {
+			lanes <- 1;
+		}
+	}
+
 	int traffic_count -> { length(people at_distance 2.0) };
 
 	aspect default {
 		rgb road_color <- traffic_count > 5 ? #orange : color_component;
-		// end_arrow dibuja la flecha indicadora de sentido al final de cada tramo
-		draw shape color: road_color width: line_width end_arrow: 2.0;
+		draw shape color: road_color width: lanes * 1.5 end_arrow: 2.0;
 	}
 }
 

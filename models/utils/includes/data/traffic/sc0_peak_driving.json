@@ -1,0 +1,46 @@
+{
+  "scenario_metadata": {
+    "scenario_group": "Escenario 0",
+    "description": "Línea Base: Hora pico cotidiana (Jueves 18:30 hrs) - Vehicular",
+    "mode": "DRIVE",
+    "timestamp_str": "2026-10-23T00:30:00Z"
+  },
+  "results": [
+    {
+      "origin_id": "ORIGIN_CUCEA",
+      "dest_id": "DEST_PERI_PONIENTE",
+      "distance_m": 2287,
+      "duration_sec": 513.0
+    },
+    {
+      "origin_id": "ORIGIN_CUCEA",
+      "dest_id": "DEST_PERI_ORIENTE",
+      "distance_m": 2868,
+      "duration_sec": 572.0
+    },
+    {
+      "origin_id": "ORIGIN_CUCEA",
+      "dest_id": "DEST_PARRES_ARIAS",
+      "distance_m": 2898,
+      "duration_sec": 512.0
+    },
+    {
+      "origin_id": "ORIGIN_TELMEX",
+      "dest_id": "DEST_PERI_PONIENTE",
+      "distance_m": 1695,
+      "duration_sec": 327.0
+    },
+    {
+      "origin_id": "ORIGIN_TELMEX",
+      "dest_id": "DEST_PERI_ORIENTE",
+      "distance_m": 2749,
+      "duration_sec": 562.0
+    },
+    {
+      "origin_id": "ORIGIN_TELMEX",
+      "dest_id": "DEST_PARRES_ARIAS",
+      "distance_m": 1614,
+      "duration_sec": 274.0
+    }
+  ]
+}

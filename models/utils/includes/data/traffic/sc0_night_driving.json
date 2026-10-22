@@ -1,0 +1,46 @@
+{
+  "scenario_metadata": {
+    "scenario_group": "Escenario 0",
+    "description": "Línea Base: Tráfico base nocturno sin evento (Viernes 23:00 hrs) - Vehicular",
+    "mode": "DRIVE",
+    "timestamp_str": "2026-10-24T05:00:00Z"
+  },
+  "results": [
+    {
+      "origin_id": "ORIGIN_ESTADIO",
+      "dest_id": "DEST_BRT_CCU",
+      "distance_m": 457,
+      "duration_sec": 91.0
+    },
+    {
+      "origin_id": "ORIGIN_ESTADIO",
+      "dest_id": "DEST_PERI_PONIENTE",
+      "distance_m": 1942,
+      "duration_sec": 370.0
+    },
+    {
+      "origin_id": "ORIGIN_ESTADIO",
+      "dest_id": "DEST_PERI_ORIENTE",
+      "distance_m": 2814,
+      "duration_sec": 560.0
+    },
+    {
+      "origin_id": "ORIGIN_CUCEA",
+      "dest_id": "DEST_BRT_CCU",
+      "distance_m": 1593,
+      "duration_sec": 287.0
+    },
+    {
+      "origin_id": "ORIGIN_CUCEA",
+      "dest_id": "DEST_PERI_PONIENTE",
+      "distance_m": 2287,
+      "duration_sec": 374.0
+    },
+    {
+      "origin_id": "ORIGIN_CUCEA",
+      "dest_id": "DEST_PERI_ORIENTE",
+      "distance_m": 2868,
+      "duration_sec": 548.0
+    }
+  ]
+}

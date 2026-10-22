@@ -1,0 +1,40 @@
+scenario_group,scenario_description,mode,origin_id,dest_id,distance_m,distance_km,traffic_min
+Escenario 0,Línea Base: Hora pico cotidiana (Jueves 18:30 hrs) - Vehicular,DRIVE,ORIGIN_CUCEA,DEST_PERI_PONIENTE,2287,2.29,8.6
+Escenario 0,Línea Base: Hora pico cotidiana (Jueves 18:30 hrs) - Vehicular,DRIVE,ORIGIN_CUCEA,DEST_PERI_ORIENTE,2868,2.87,9.5
+Escenario 0,Línea Base: Hora pico cotidiana (Jueves 18:30 hrs) - Vehicular,DRIVE,ORIGIN_CUCEA,DEST_PARRES_ARIAS,2898,2.9,8.5
+Escenario 0,Línea Base: Hora pico cotidiana (Jueves 18:30 hrs) - Vehicular,DRIVE,ORIGIN_TELMEX,DEST_PERI_PONIENTE,1695,1.7,5.5
+Escenario 0,Línea Base: Hora pico cotidiana (Jueves 18:30 hrs) - Vehicular,DRIVE,ORIGIN_TELMEX,DEST_PERI_ORIENTE,2749,2.75,9.4
+Escenario 0,Línea Base: Hora pico cotidiana (Jueves 18:30 hrs) - Vehicular,DRIVE,ORIGIN_TELMEX,DEST_PARRES_ARIAS,1614,1.61,4.6
+Escenario 0,Línea Base: Tráfico base nocturno sin evento (Viernes 23:00 hrs) - Vehicular,DRIVE,ORIGIN_ESTADIO,DEST_BRT_CCU,457,0.46,1.5
+Escenario 0,Línea Base: Tráfico base nocturno sin evento (Viernes 23:00 hrs) - Vehicular,DRIVE,ORIGIN_ESTADIO,DEST_PERI_PONIENTE,1942,1.94,6.2
+Escenario 0,Línea Base: Tráfico base nocturno sin evento (Viernes 23:00 hrs) - Vehicular,DRIVE,ORIGIN_ESTADIO,DEST_PERI_ORIENTE,2814,2.81,9.3
+Escenario 0,Línea Base: Tráfico base nocturno sin evento (Viernes 23:00 hrs) - Vehicular,DRIVE,ORIGIN_CUCEA,DEST_BRT_CCU,1593,1.59,4.8
+Escenario 0,Línea Base: Tráfico base nocturno sin evento (Viernes 23:00 hrs) - Vehicular,DRIVE,ORIGIN_CUCEA,DEST_PERI_PONIENTE,2287,2.29,6.2
+Escenario 0,Línea Base: Tráfico base nocturno sin evento (Viernes 23:00 hrs) - Vehicular,DRIVE,ORIGIN_CUCEA,DEST_PERI_ORIENTE,2868,2.87,9.1
+Escenario 1,Prueba de Estrés: Evacuación Estadio (30k) Vehicular - Viernes 23:00 hrs,DRIVE,ORIGIN_ESTADIO,DEST_BRT_CCU,457,0.46,1.5
+Escenario 1,Prueba de Estrés: Evacuación Estadio (30k) Vehicular - Viernes 23:00 hrs,DRIVE,ORIGIN_ESTADIO,DEST_BRT_CONST,961,0.96,3.2
+Escenario 1,Prueba de Estrés: Evacuación Estadio (30k) Vehicular - Viernes 23:00 hrs,DRIVE,ORIGIN_ESTADIO,DEST_L3_MMAR,2617,2.62,8.8
+Escenario 1,Prueba de Estrés: Evacuación Estadio (30k) Vehicular - Viernes 23:00 hrs,DRIVE,ORIGIN_ESTADIO,DEST_PERI_PONIENTE,1942,1.94,6.2
+Escenario 1,Prueba de Estrés: Evacuación Estadio (30k) Vehicular - Viernes 23:00 hrs,DRIVE,ORIGIN_ESTADIO,DEST_PERI_ORIENTE,2814,2.81,9.3
+Escenario 1,Prueba de Estrés: Evacuación Estadio (30k) Vehicular - Viernes 23:00 hrs,DRIVE,ORIGIN_ESTADIO,DEST_PARRES_ARIAS,1862,1.86,6.1
+Escenario 1,Prueba de Estrés: Caminata hacia BRT/L3 (10.8k peatonas) - Viernes 23:00 hrs,WALK,ORIGIN_ESTADIO,DEST_BRT_CCU,457,0.46,6.3
+Escenario 1,Prueba de Estrés: Caminata hacia BRT/L3 (10.8k peatonas) - Viernes 23:00 hrs,WALK,ORIGIN_ESTADIO,DEST_BRT_CONST,625,0.62,8.9
+Escenario 1,Prueba de Estrés: Caminata hacia BRT/L3 (10.8k peatonas) - Viernes 23:00 hrs,WALK,ORIGIN_ESTADIO,DEST_L3_MMAR,1907,1.91,26.9
+Escenario 1e,Crisis Extrema: Desalojo Simultáneo Estadio (30k) + Telmex (11.5k) Vehicular,DRIVE,ORIGIN_ESTADIO,DEST_BRT_CCU,457,0.46,1.5
+Escenario 1e,Crisis Extrema: Desalojo Simultáneo Estadio (30k) + Telmex (11.5k) Vehicular,DRIVE,ORIGIN_ESTADIO,DEST_BRT_CONST,961,0.96,3.2
+Escenario 1e,Crisis Extrema: Desalojo Simultáneo Estadio (30k) + Telmex (11.5k) Vehicular,DRIVE,ORIGIN_ESTADIO,DEST_L3_MMAR,2617,2.62,8.8
+Escenario 1e,Crisis Extrema: Desalojo Simultáneo Estadio (30k) + Telmex (11.5k) Vehicular,DRIVE,ORIGIN_ESTADIO,DEST_PERI_PONIENTE,1942,1.94,6.2
+Escenario 1e,Crisis Extrema: Desalojo Simultáneo Estadio (30k) + Telmex (11.5k) Vehicular,DRIVE,ORIGIN_ESTADIO,DEST_PERI_ORIENTE,2814,2.81,9.3
+Escenario 1e,Crisis Extrema: Desalojo Simultáneo Estadio (30k) + Telmex (11.5k) Vehicular,DRIVE,ORIGIN_ESTADIO,DEST_PARRES_ARIAS,1862,1.86,6.1
+Escenario 1e,Crisis Extrema: Desalojo Simultáneo Estadio (30k) + Telmex (11.5k) Vehicular,DRIVE,ORIGIN_TELMEX,DEST_BRT_CCU,2350,2.35,6.2
+Escenario 1e,Crisis Extrema: Desalojo Simultáneo Estadio (30k) + Telmex (11.5k) Vehicular,DRIVE,ORIGIN_TELMEX,DEST_BRT_CONST,896,0.9,2.3
+Escenario 1e,Crisis Extrema: Desalojo Simultáneo Estadio (30k) + Telmex (11.5k) Vehicular,DRIVE,ORIGIN_TELMEX,DEST_L3_MMAR,2369,2.37,7.7
+Escenario 1e,Crisis Extrema: Desalojo Simultáneo Estadio (30k) + Telmex (11.5k) Vehicular,DRIVE,ORIGIN_TELMEX,DEST_PERI_PONIENTE,1695,1.7,5.2
+Escenario 1e,Crisis Extrema: Desalojo Simultáneo Estadio (30k) + Telmex (11.5k) Vehicular,DRIVE,ORIGIN_TELMEX,DEST_PERI_ORIENTE,2749,2.75,8.4
+Escenario 1e,Crisis Extrema: Desalojo Simultáneo Estadio (30k) + Telmex (11.5k) Vehicular,DRIVE,ORIGIN_TELMEX,DEST_PARRES_ARIAS,1614,1.61,5.1
+Escenario 1e,Crisis Extrema: Desalojo Peatonal Cruzado Estadio + Telmex hacia Transporte,WALK,ORIGIN_ESTADIO,DEST_BRT_CCU,457,0.46,6.3
+Escenario 1e,Crisis Extrema: Desalojo Peatonal Cruzado Estadio + Telmex hacia Transporte,WALK,ORIGIN_ESTADIO,DEST_BRT_CONST,625,0.62,8.9
+Escenario 1e,Crisis Extrema: Desalojo Peatonal Cruzado Estadio + Telmex hacia Transporte,WALK,ORIGIN_ESTADIO,DEST_L3_MMAR,1907,1.91,26.9
+Escenario 1e,Crisis Extrema: Desalojo Peatonal Cruzado Estadio + Telmex hacia Transporte,WALK,ORIGIN_TELMEX,DEST_BRT_CCU,637,0.64,8.8
+Escenario 1e,Crisis Extrema: Desalojo Peatonal Cruzado Estadio + Telmex hacia Transporte,WALK,ORIGIN_TELMEX,DEST_BRT_CONST,896,0.9,12.0
+Escenario 1e,Crisis Extrema: Desalojo Peatonal Cruzado Estadio + Telmex hacia Transporte,WALK,ORIGIN_TELMEX,DEST_L3_MMAR,1156,1.16,16.3

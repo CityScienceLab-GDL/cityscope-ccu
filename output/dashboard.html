@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CityScope Guadalajara - Interactive Dashboard</title>
+  
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- PLUGIN MAPA DE CALOR LEAFLET -->
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+  <style>
+    :root {
+      --bg-black: #020408;
+      --card-bg: #090d14;
+      --border-color: rgba(0, 243, 255, 0.25);
+      --cyan-glow: #00bfff;
+      --green-glow: #00ff66;
+      --orange-glow: #ff9900;
+      --red-glow: #ff3366;
+      --text-main: #f1f5f9;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-black);
+      color: var(--text-main);
+      font-family: 'Inter', sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 12px 20px;
+      overflow: hidden;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      border-bottom: 1px solid rgba(0, 243, 255, 0.2);
+      padding-bottom: 6px;
+    }
+
+    .title-main {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.3rem;
+      letter-spacing: 2px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .status-online {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.75rem;
+      color: var(--green-glow);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--green-glow);
+      box-shadow: 0 0 8px var(--green-glow); animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 12px;
+      height: calc(100vh - 60px);
+    }
+
+    .left-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .right-panel {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 12px;
+    }
+
+    .sub-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .card-label {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.8rem;
+      color: var(--cyan-glow);
+      letter-spacing: 1.2px;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* CONTROLES REMOTOS */
+    .controls-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: rgba(0,0,0,0.5);
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .control-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.78rem;
+    }
+
+    .btn-group { display: flex; gap: 6px; }
+
+    .btn-cmd {
+      background: rgba(0, 191, 255, 0.12);
+      border: 1px solid var(--cyan-glow);
+      color: #fff;
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      cursor: pointer;
+      font-family: 'Orbitron', sans-serif;
+      transition: all 0.2s;
+    }
+
+    .btn-cmd:hover, .btn-cmd.active {
+      background: var(--cyan-glow);
+      color: #000;
+      font-weight: bold;
+      box-shadow: 0 0 10px var(--cyan-glow);
+    }
+
+    .btn-stress-green.active { background: var(--green-glow); border-color: var(--green-glow); color: #000; }
+    .btn-stress-yellow.active { background: var(--orange-glow); border-color: var(--orange-glow); color: #000; }
+    .btn-stress-red.active { background: var(--red-glow); border-color: var(--red-glow); color: #fff; }
+
+    /* TOOLBAR DE RUTAS CUSTOM */
+    .custom-route-toolbar {
+      display: flex;
+      gap: 6px;
+      margin-top: 4px;
+      padding-top: 6px;
+      border-top: 1px dashed rgba(255, 255, 255, 0.1);
+      align-items: center;
+    }
+
+    .btn-picker {
+      background: rgba(234, 179, 8, 0.15);
+      color: #fde047;
+      border: 1px solid rgba(234, 179, 8, 0.35);
+      padding: 4px 8px;
+      font-size: 0.7rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: 'Orbitron', sans-serif;
+    }
+
+    .btn-picker.active {
+      background: rgba(234, 179, 8, 0.4);
+      border-color: #fde047;
+      box-shadow: 0 0 8px rgba(234, 179, 8, 0.5);
+    }
+
+    /* RADAR */
+    .radar-wrapper {
+      position: relative;
+      flex-grow: 1;
+      width: 100%; height: 100%;
+    }
+
+    .radar-legend {
+      display: flex;
+      gap: 20px;
+      font-size: 0.75rem;
+      margin-top: 8px;
+      padding-top: 6px;
+      border-top: 1px dashed rgba(255, 255, 255, 0.1);
+      justify-content: center;
+    }
+
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .legend-box { width: 12px; height: 12px; border-radius: 2px; }
+
+    .map-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      min-height: 220px;
+    }
+
+    #map2d {
+      width: 100%; height: 100%;
+      border-radius: 6px;
+      border: 1px solid rgba(0, 191, 255, 0.2);
+      background: #090d14;
+    }
+
+    .dark-mode-tiles {
+      filter: invert(90%) hue-rotate(180deg) brightness(0.7) contrast(0.85) grayscale(0.5);
+      opacity: 0.88;
+    }
+
+    .node-marker-circle {
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 50%; color: #ffffff; font-size: 12px; font-weight: bold;
+      box-shadow: 0 0 8px rgba(0,0,0,0.8), 0 0 4px rgba(255,255,255,0.6);
+      border: 2px solid #ffffff; cursor: pointer;
+    }
+
+    /* LEYENDA DEL MAPA DE CALOR */
+    .heatmap-legend {
+      position: absolute;
+      top: 12px; right: 12px;
+      background: rgba(9, 13, 20, 0.88);
+      border: 1px solid rgba(0, 243, 255, 0.3);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 0.7rem;
+      z-index: 1000;
+      backdrop-filter: blur(6px);
+    }
+
+    .heatmap-bar {
+      width: 120px;
+      height: 8px;
+      border-radius: 4px;
+      background: linear-gradient(to right, #0000ff, #00ffff, #00ff00, #ffff00, #ff0000);
+      margin-top: 3px;
+    }
+
+    .heatmap-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.65rem;
+      color: #a0aec0;
+      margin-top: 2px;
+    }
+
+    #route-info-badge {
+      position: absolute;
+      bottom: 12px; right: 12px;
+      background: rgba(6, 12, 24, 0.90);
+      border: 1px solid rgba(0, 243, 255, 0.4);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 0.72rem;
+      z-index: 1000;
+      display: none;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.8);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="title-main">URBAN PERFORMANCE & TRAFFIC HEATMAP</div>
+    <div class="status-online">
+      <div class="status-dot"></div>
+      GAMA Engine Connected
+    </div>
+  </header>
+
+  <div class="main-grid">
+    
+    <!-- RADAR CHART -->
+    <div class="left-panel">
+      <div class="card-label">Urban Performance Radar</div>
+      <div class="radar-wrapper">
+        <canvas id="cityScopeRadar"></canvas>
+      </div>
+      <div class="radar-legend">
+        <div class="legend-item">
+          <div class="legend-box" style="background: rgba(0, 119, 255, 0.8); border: 1px solid #0077ff;"></div>
+          <span>Escenario Actual (S1)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-box" style="background: transparent; border: 2px solid #00ff66;"></div>
+          <span>Plan Maestro / Futuro (S2)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANEL DERECHO -->
+    <div class="right-panel">
+      
+      <!-- CONTROLES INTERACTIVOS + RUTAS -->
+      <div class="sub-card">
+        <div class="card-label">
+          <span>Simulation Remote Control & Mobility</span>
+          <span style="font-size: 0.7rem; color: var(--green-glow);" id="veh-display">Vehículos: 0</span>
+        </div>
+        
+        <div class="controls-grid">
+          <div class="control-row">
+            <span>Escenario Urbano:</span>
+            <div class="btn-group">
+              <button class="btn-cmd active" id="btn-sc1" onclick="setScenario(1)">S1 (Base)</button>
+              <button class="btn-cmd" id="btn-sc2" onclick="setScenario(2)">S2 (Plan Maestro)</button>
+            </div>
+          </div>
+
+          <div class="control-row">
+            <span>Estrés de Movilidad:</span>
+            <div class="btn-group">
+              <button class="btn-cmd btn-stress-green active" id="btn-st-80" onclick="setMobilityStress(80)">Normal</button>
+              <button class="btn-cmd btn-stress-yellow" id="btn-st-200" onclick="setMobilityStress(400)">Hora Pico</button>
+              <button class="btn-cmd btn-stress-red" id="btn-st-400" onclick="setMobilityStress(800)">Crítico</button>
+            </div>
+          </div>
+          
+          <div class="control-row">
+            <span>Capa Activa GAMA:</span>
+            <div class="btn-group">
+              <button class="btn-cmd active" id="btn-ly-emissions" onclick="setLayer('emissions')">Emisiones / Tráfico</button>
+              <button class="btn-cmd" id="btn-ly-pop" onclick="setLayer('population')">Densidad</button>
+              <button class="btn-cmd" id="btn-ly-div" onclick="setLayer('day_div')">Diversidad</button>
+            </div>
+          </div>
+
+          <div class="control-row">
+            <span>Modo de Recorrido:</span>
+            <div class="btn-group">
+              <button class="btn-cmd active" id="btn-mode-drive" onclick="setRouteMode('DRIVE')">🚗 Vehicular</button>
+              <button class="btn-cmd" id="btn-mode-walk" onclick="setRouteMode('WALK')">🚶 Peatonal</button>
+            </div>
+          </div>
+
+          <div class="custom-route-toolbar">
+            <span style="font-size: 0.72rem; color: #fde047; font-weight: bold;">📍 Ruta Custom O-D:</span>
+            <button class="btn-picker" id="btn-pick-orig" onclick="togglePicker('origin')">📍 Clic Origen</button>
+            <button class="btn-picker" id="btn-pick-dest" onclick="togglePicker('dest')">🎯 Clic Destino</button>
+            <span id="custom-picker-status" style="font-size: 0.68rem; color: #a0aec0; margin-left: auto;">Toca 'Origen' y luego el mapa</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- MAPA CON HEATMAP DE TRÁFICO Y RUTAS OSRM -->
+      <div class="sub-card">
+        <div class="card-label">
+          <span>Traffic & Congestion Density Heatmap</span>
+          <span style="font-size: 0.7rem; color: var(--orange-glow);" id="speed-display">Velocidad Prom: 0 km/h</span>
+        </div>
+        
+        <div class="map-container">
+          <div id="map2d"></div>
+
+          <!-- LEYENDA DEL MAPA DE CALOR -->
+          <div class="heatmap-legend">
+            <div style="font-weight: bold; color: #00f3ff;">Densidad de Tráfico</div>
+            <div class="heatmap-bar"></div>
+            <div class="heatmap-labels">
+              <span>Fluido</span>
+              <span>Moderado</span>
+              <span>Congestión</span>
+            </div>
+          </div>
+
+          <div id="route-info-badge">
+            <div style="font-weight: bold; color: #00f3ff;" id="badge-title">Ruta Custom</div>
+            <div id="badge-body" style="color: #ffffff;">Distancia: 0 km | Tiempo: 0 min</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    let activeScenario = 1;
+    let vehicleCount = 100;
+    let currentLayer = 'emissions';
+    let routeMode = 'DRIVE';
+
+    // Bounding Box (Envelope) de respaldo para conversión espacial
+    const SHAPEFILE_ENVELOPE = {
+      xMin: -103.3825, xMax: -103.3682,
+      yMin: 20.7320,   yMax: 20.7445,
+      width: 1525.0,   height: 1080.0
+    };
+
+    function gamaToLatLng(x, y) {
+      if (x === undefined || y === undefined || isNaN(x) || isNaN(y)) return null;
+      const lng = SHAPEFILE_ENVELOPE.xMin + (x / SHAPEFILE_ENVELOPE.width) * (SHAPEFILE_ENVELOPE.xMax - SHAPEFILE_ENVELOPE.xMin);
+      const lat = SHAPEFILE_ENVELOPE.yMax - (y / SHAPEFILE_ENVELOPE.height) * (SHAPEFILE_ENVELOPE.yMax - SHAPEFILE_ENVELOPE.yMin);
+      return [lat, lng];
+    }
+
+    // NODOS URBANOS ESTRATÉGICOS
+    const NODES = {
+      "ORIGIN_ESTADIO": { lat: 20.733753, lng: -103.375535, name: "Estadio (30k)", icon: "🏟️", color: "#ef4444", size: 26 },
+      "ORIGIN_TELMEX": { lat: 20.733777, lng: -103.381626, name: "Auditorio Telmex", icon: "🎭", color: "#f97316", size: 24 },
+      "ORIGIN_CUCEA": { lat: 20.742500, lng: -103.380200, name: "CUCEA / Belenes", icon: "🎓", color: "#a855f7", size: 24 },
+      "DEST_BRT_CCU": { lat: 20.738939, lng: -103.381113, name: "Mi Macro CCU", icon: "🚌", color: "#38bdf8", size: 22 },
+      "DEST_L3_MMAR": { lat: 20.728752, lng: -103.389188, name: "L3 Mercado del Mar", icon: "🚊", color: "#34d399", size: 24 },
+      "DEST_PERI_PONIENTE": { lat: 20.740800, lng: -103.391000, name: "Periférico Poniente", icon: "🚗", color: "#94a3b8", size: 22 }
+    };
+
+    // 1. RADAR CHART
+    const radarLabels = [
+      'Night Div.', 'Interaction', 'Knowledge Div.', 'Energy Req.', 'Water Req.', 'Waste Gen.', 
+      'Green Space', 'Roads/Hab', 'Public Transit', 'Facilities Prox.', 'Act. Density', 
+      'Hab. Density', 'Housing Den.', 'Day Div.'
+    ];
+
+    const ctxRadar = document.getElementById('cityScopeRadar').getContext('2d');
+    const radarChart = new Chart(ctxRadar, {
+      type: 'radar',
+      data: {
+        labels: radarLabels,
+        datasets: [
+          { label: 'Escenario Actual (S1)', data: new Array(14).fill(0.2), fill: true, backgroundColor: 'rgba(0, 119, 255, 0.40)', borderColor: '#0077ff', borderWidth: 2, pointRadius: 4 },
+          { label: 'Plan Maestro / Futuro (S2)', data: new Array(14).fill(0.5), fill: false, borderColor: '#00ff66', borderWidth: 2.5, pointRadius: 4 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          r: {
+            angleLines: { color: 'rgba(0, 243, 255, 0.25)' },
+            grid: { color: 'rgba(0, 243, 255, 0.18)' },
+            pointLabels: { color: '#00f3ff', font: { family: 'Orbitron', size: 13, weight: '700' } },
+            ticks: { display: false, min: 0, max: 1.0 }
+          }
+        },
+        plugins: { legend: { display: false } }
+      }
+    });
+
+    function normalizeIndicators(rawVal) {
+      const bounds = [1.5, 3.5, 2.5, 3000, 200, 2.0, 1.0, 5.0, 1.0, 1.0, 1.0, 100, 30, 3.5];
+      return rawVal.map((v, i) => Math.min(1.0, Math.max(0.0, v / (bounds[i] || 1.0))));
+    }
+
+    // 2. MAPA LEAFLET + CAPA DE HEATMAP
+    const map = L.map('map2d', { zoomControl: false }).setView([20.738, -103.377], 15);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors',
+      className: 'dark-mode-tiles'
+    }).addTo(map);
+
+    // INSTANCIAR CAPA DE MAPA DE CALOR LEAFLET
+    let heatLayer = L.heatLayer([], {
+      radius: 22,
+      blur: 15,
+      maxZoom: 17,
+      max: 1.0,
+      gradient: {
+        0.2: '#0000ff',
+        0.4: '#00ffff',
+        0.6: '#00ff00',
+        0.8: '#ffff00',
+        1.0: '#ff0000'
+      }
+    }).addTo(map);
+
+    let routeLayerGroup = L.layerGroup().addTo(map);
+    let customRouteLayerGroup = L.layerGroup().addTo(map);
+    let nodeMarkersGroup = L.layerGroup().addTo(map);
+
+    L.polygon([
+      [20.744, -103.382], [20.744, -103.370],
+      [20.732, -103.370], [20.732, -103.382]
+    ], { color: '#00f3ff', weight: 1.5, dashArray: '4, 4', fillColor: '#00bfff', fillOpacity: 0.05 }).addTo(map);
+
+    function renderNodeMarkers() {
+      nodeMarkersGroup.clearLayers();
+      Object.keys(NODES).forEach(key => {
+        const n = NODES[key];
+        const iconHtml = `<div class="node-marker-circle" style="background:${n.color}; width:${n.size}px; height:${n.size}px;">${n.icon}</div>`;
+        const customIcon = L.divIcon({ html: iconHtml, className: '', iconSize: [n.size, n.size], iconAnchor: [n.size/2, n.size/2] });
+        L.marker([n.lat, n.lng], { icon: customIcon }).bindTooltip(`${n.icon} ${n.name}`, { permanent: false, direction: 'top' }).addTo(nodeMarkersGroup);
+      });
+    }
+    renderNodeMarkers();
+
+    // OSRM ROUTING
+    const routeCache = {};
+    async function fetchStreetRouteOSRM(orig, dest, mode) {
+      const profile = mode === 'WALK' ? 'foot' : 'driving';
+      const cacheKey = `${profile}_${orig.lat.toFixed(4)}_${orig.lng.toFixed(4)}_${dest.lat.toFixed(4)}_${dest.lng.toFixed(4)}`;
+      if (routeCache[cacheKey]) return routeCache[cacheKey];
+
+      const url = `https://router.project-osrm.org/route/v1/${profile}/${orig.lng},${orig.lat};${dest.lng},${dest.lat}?overview=full&geometries=geojson`;
+      try {
+        const resp = await fetch(url);
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data && data.routes && data.routes.length > 0) {
+            const route = data.routes[0];
+            const coords = route.geometry.coordinates.map(pt => [pt[1], pt[0]]);
+            const result = { coords, distanceKm: (route.distance / 1000).toFixed(2), durationMin: (route.duration / 60).toFixed(1) };
+            routeCache[cacheKey] = result;
+            return result;
+          }
+        }
+      } catch (e) {}
+      return { coords: [[orig.lat, orig.lng], [dest.lat, dest.lng]], distanceKm: '1.2', durationMin: '4.5' };
+    }
+
+    async function drawKeyCorridorRoutes() {
+      routeLayerGroup.clearLayers();
+      const corridorPairs = [
+        ["ORIGIN_ESTADIO", "DEST_BRT_CCU"],
+        ["ORIGIN_TELMEX", "DEST_L3_MMAR"],
+        ["ORIGIN_CUCEA", "DEST_PERI_PONIENTE"]
+      ];
+
+      for (const pair of corridorPairs) {
+        const orig = NODES[pair[0]];
+        const dest = NODES[pair[1]];
+        if (orig && dest) {
+          const res = await fetchStreetRouteOSRM(orig, dest, routeMode);
+          const speedKmh = parseFloat(res.distanceKm) / (parseFloat(res.durationMin) / 60);
+          const color = routeMode === 'WALK' ? '#f43f5e' : (speedKmh < 15 ? '#ef4444' : (speedKmh <= 25 ? '#facc15' : '#00f3ff'));
+
+          const line = L.polyline(res.coords, {
+            color: color, weight: routeMode === 'WALK' ? 3.5 : 5, opacity: 0.85, dashArray: routeMode === 'WALK' ? '6, 8' : '1, 0'
+          }).addTo(routeLayerGroup);
+
+          line.on('click', () => {
+            document.getElementById('route-info-badge').style.display = 'block';
+            document.getElementById('badge-title').innerText = `${orig.icon} ${orig.name} ➔ ${dest.name}`;
+            document.getElementById('badge-body').innerText = `Distancia: ${res.distanceKm} km | Tiempo (${routeMode}): ${res.durationMin} min | Vel: ${speedKmh.toFixed(1)} km/h`;
+          });
+        }
+      }
+    }
+    drawKeyCorridorRoutes();
+
+    // RUTA PERSONALIZADA (CUSTOM O-D)
+    let activePickerMode = null;
+    let customOrigin = null;
+    let customDest = null;
+
+    function resetCustomRoute() {
+      customOrigin = null; customDest = null;
+      delete NODES["CUSTOM_ORIG"]; delete NODES["CUSTOM_DEST"];
+      customRouteLayerGroup.clearLayers(); renderNodeMarkers();
+      document.getElementById('route-info-badge').style.display = 'none';
+    }
+
+    function togglePicker(mode) {
+      if (mode === 'origin') resetCustomRoute();
+      activePickerMode = activePickerMode === mode ? null : mode;
+      document.getElementById('btn-pick-orig').classList.toggle('active', activePickerMode === 'origin');
+      document.getElementById('btn-pick-dest').classList.toggle('active', activePickerMode === 'dest');
+      const statusEl = document.getElementById('custom-picker-status');
+      if (activePickerMode === 'origin') statusEl.innerText = '👉 Clic sobre el mapa para ORIGEN';
+      else if (activePickerMode === 'dest') statusEl.innerText = '👉 Clic sobre el mapa para DESTINO';
+      else statusEl.innerText = customOrigin ? '📍 Origen listo. Toca Destino.' : 'Toca "Origen" y luego el mapa';
+    }
+
+    map.on('click', async (e) => {
+      if (activePickerMode === 'origin') {
+        customDest = null; delete NODES["CUSTOM_DEST"]; customRouteLayerGroup.clearLayers();
+        customOrigin = { lat: e.latlng.lat, lng: e.latlng.lng, name: "Origen Custom", icon: "📍", color: "#fde047", size: 24 };
+        NODES["CUSTOM_ORIG"] = customOrigin;
+        document.getElementById('custom-picker-status').innerText = '📍 Origen fijado. Toca "Clic Destino" y luego el mapa';
+        activePickerMode = null; document.getElementById('btn-pick-orig').classList.remove('active');
+        renderNodeMarkers();
+      } else if (activePickerMode === 'dest') {
+        customDest = { lat: e.latlng.lat, lng: e.latlng.lng, name: "Destino Custom", icon: "🎯", color: "#ec4899", size: 24 };
+        NODES["CUSTOM_DEST"] = customDest;
+        document.getElementById('custom-picker-status').innerText = '🎯 Destino fijado. Calculando...';
+        activePickerMode = null; document.getElementById('btn-pick-dest').classList.remove('active');
+        renderNodeMarkers();
+      }
+
+      if (customOrigin && customDest) {
+        customRouteLayerGroup.clearLayers();
+        const res = await fetchStreetRouteOSRM(customOrigin, customDest, routeMode);
+        L.polyline(res.coords, { color: '#ffffff', weight: 6, opacity: 0.95, dashArray: '2, 6' }).addTo(customRouteLayerGroup);
+        document.getElementById('custom-picker-status').innerText = `✅ Ruta: ${res.distanceKm} km | ~${res.durationMin} min`;
+        document.getElementById('route-info-badge').style.display = 'block';
+        document.getElementById('badge-title').innerText = '📍 Ruta Personalizada (Custom O-D)';
+        document.getElementById('badge-body').innerText = `Distancia: ${res.distanceKm} km | Tiempo Estimado (${routeMode}): ${res.durationMin} min`;
+      }
+    });
+
+    // 3. SINCRONIZACIÓN CON GAMA (LECTURA ROBUSTA DE CSV + HEATMAP EN VIVO)
+    async function fetchCSVData(filename) {
+      const candidatePaths = [
+        `/includes/data/${filename}`,
+        `../includes/data/${filename}`,
+        `includes/data/${filename}`,
+        filename
+      ];
+
+      for (const path of candidatePaths) {
+        try {
+          const res = await fetch(path + '?t=' + new Date().getTime());
+          if (res.ok) {
+            const text = await res.text();
+            
+            // Limpiar retornos de carro (\r) y separar por líneas físicas
+            const lines = text.replace(/\r/g, '').trim().split('\n');
+            const lastLine = lines[lines.length - 1];
+            const rawValues = lastLine.split(',').map(v => parseFloat(v.trim()));
+            const validValues = rawValues.filter(v => !isNaN(v));
+
+            if (validValues.length >= 14) {
+              return normalizeIndicators(validValues.slice(0, 14));
+            }
+          }
+        } catch (e) {
+          console.warn(`Error leyendo ${filename}:`, e);
+        }
+      }
+      return null;
+    }
+
+    async function syncWithGama() {
+      try {
+        // Actualizar Radar Chart
+        const s1Val = await fetchCSVData('output_s1.csv');
+        if (s1Val) {
+          for (let i = 0; i < 14; i++) radarChart.data.datasets[0].data[i] = s1Val[i];
+        }
+
+        const s2Val = await fetchCSVData('output_s2.csv');
+        if (s2Val) {
+          for (let i = 0; i < 14; i++) radarChart.data.datasets[1].data[i] = s2Val[i];
+        }
+
+        radarChart.update();
+
+        // Actualizar Heatmap de Tráfico y Emisiones
+        const emissionsPaths = [
+          '/includes/data/emissions_data.json',
+          '../includes/data/emissions_data.json',
+          'includes/data/emissions_data.json',
+          'emissions_data.json'
+        ];
+
+        for (const p of emissionsPaths) {
+          try {
+            const resEmissions = await fetch(p + '?t=' + new Date().getTime());
+            if (resEmissions.ok) {
+              const rawText = await resEmissions.text();
+              let emData = JSON.parse(rawText);
+
+              if (typeof emData === 'string') emData = JSON.parse(emData);
+              if (Array.isArray(emData) && emData.length > 0) {
+                emData = typeof emData[0] === 'string' ? JSON.parse(emData[0]) : emData[0];
+              }
+
+              if (emData) {
+                document.getElementById('speed-display').innerText = `Velocidad Prom: ${Math.round(emData.avg_speed || 0)} km/h`;
+                document.getElementById('veh-display').innerText = `Vehículos: ${emData.vehicles_count || vehicleCount}`;
+
+                const heatPoints = [];
+
+                if (emData.points && Array.isArray(emData.points)) {
+                  emData.points.forEach(pt => {
+                    let lat = parseFloat(pt.lat);
+                    let lng = parseFloat(pt.lng);
+
+                    if (isNaN(lat) || isNaN(lng)) {
+                      const coords = gamaToLatLng(parseFloat(pt.x), parseFloat(pt.y));
+                      if (coords) { lat = coords[0]; lng = coords[1]; }
+                    }
+
+                    if (!isNaN(lat) && !isNaN(lng) && lat > 15 && lat < 30) {
+                      const intensity = parseFloat(pt.weight || pt.intensity || 0.7);
+                      heatPoints.push([lat, lng, intensity]);
+                    }
+                  });
+                }
+
+                // ACTUALIZAR MANCHA TÉRMICA LEAFLET EN VIVO
+                heatLayer.setLatLngs(heatPoints);
+              }
+              break;
+            }
+          } catch (e) {}
+        }
+      } catch (err) {}
+    }
+
+    // 4. CONTROLES REMOTOS
+    async function sendControlCommand() {
+      await fetch('/api/control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active_scenario: activeScenario, vehicle_count: vehicleCount, active_layer: currentLayer })
+      });
+    }
+
+    function setScenario(sc) {
+      activeScenario = sc;
+      document.getElementById('btn-sc1').classList.toggle('active', sc === 1);
+      document.getElementById('btn-sc2').classList.toggle('active', sc === 2);
+      sendControlCommand();
+    }
+
+    function setMobilityStress(count) {
+      vehicleCount = count;
+      document.getElementById('btn-st-80').classList.toggle('active', count === 80);
+      document.getElementById('btn-st-200').classList.toggle('active', count === 400);
+      document.getElementById('btn-st-400').classList.toggle('active', count === 800);
+      sendControlCommand();
+    }
+
+    function setLayer(layer) {
+      currentLayer = layer;
+      document.getElementById('btn-ly-emissions').classList.toggle('active', layer === 'emissions');
+      document.getElementById('btn-ly-pop').classList.toggle('active', layer === 'population');
+      document.getElementById('btn-ly-div').classList.toggle('active', layer === 'day_div');
+      sendControlCommand();
+    }
+
+    function setRouteMode(mode) {
+      routeMode = mode;
+      document.getElementById('btn-mode-drive').classList.toggle('active', mode === 'DRIVE');
+      document.getElementById('btn-mode-walk').classList.toggle('active', mode === 'WALK');
+      drawKeyCorridorRoutes();
+      if (customOrigin && customDest) {
+        fetchStreetRouteOSRM(customOrigin, customDest, routeMode).then(res => {
+          customRouteLayerGroup.clearLayers();
+          L.polyline(res.coords, { color: '#ffffff', weight: 6, opacity: 0.95, dashArray: '2, 6' }).addTo(customRouteLayerGroup);
+          document.getElementById('badge-body').innerText = `Distancia: ${res.distanceKm} km | Tiempo Estimado (${routeMode}): ${res.durationMin} min`;
+        });
+      }
+    }
+
+    setInterval(syncWithGama, 1500);
+  </script>
+</body>
+</html>

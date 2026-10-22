@@ -1,0 +1,46 @@
+{
+  "scenario_metadata": {
+    "scenario_group": "Escenario 1",
+    "description": "Prueba de Estrés: Evacuación Estadio (30k) Vehicular - Viernes 23:00 hrs",
+    "mode": "DRIVE",
+    "timestamp_str": "2026-10-24T05:00:00Z"
+  },
+  "results": [
+    {
+      "origin_id": "ORIGIN_ESTADIO",
+      "dest_id": "DEST_BRT_CCU",
+      "distance_m": 457,
+      "duration_sec": 91.0
+    },
+    {
+      "origin_id": "ORIGIN_ESTADIO",
+      "dest_id": "DEST_BRT_CONST",
+      "distance_m": 961,
+      "duration_sec": 193.0
+    },
+    {
+      "origin_id": "ORIGIN_ESTADIO",
+      "dest_id": "DEST_L3_MMAR",
+      "distance_m": 2617,
+      "duration_sec": 526.0
+    },
+    {
+      "origin_id": "ORIGIN_ESTADIO",
+      "dest_id": "DEST_PERI_PONIENTE",
+      "distance_m": 1942,
+      "duration_sec": 370.0
+    },
+    {
+      "origin_id": "ORIGIN_ESTADIO",
+      "dest_id": "DEST_PERI_ORIENTE",
+      "distance_m": 2814,
+      "duration_sec": 560.0
+    },
+    {
+      "origin_id": "ORIGIN_ESTADIO",
+      "dest_id": "DEST_PARRES_ARIAS",
+      "distance_m": 1862,
+      "duration_sec": 366.0
+    }
+  ]
+}

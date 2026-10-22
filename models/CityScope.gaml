@@ -11,7 +11,9 @@ global skills:[network]{
 	
 	// --- CAMPOS ESCALARES 3D (FIELD) ---
 	field heatmap_field <- field(120, 120);
-	list<rgb> heatmap_palette <- palette([#navy, #blue, #cyan, #green, #yellow, #orange, #red]);
+	// Paleta Cyberpunk de Alto Contraste (Transparente en base -> Cian -> Verde -> Amarillo -> Rojo -> Magenta)
+	// Paleta que inicia en NEGRO para fundir el valor 0.0 con el fondo
+	list<rgb> heatmap_palette <- palette([#black, #navy, #blue, #cyan, #green, #yellow, #orange, #red]);
 	
 	field emissions_field <- field(120, 120);
 	list<rgb> emissions_palette <- palette([#black, #darkgreen, #yellow, #orange, #red, #purple]);
@@ -79,6 +81,9 @@ global skills:[network]{
 	bool show_people <- true;
 	bool show_information <- false;
 	bool show_emissions <- false;
+	
+	// Lista persistente de unidades económicas para evitar consultas concurrentes a la población
+	list<economic_unit> active_economic_units;
 	
 	// Variables de mapa de calor
 	string current_heatmap 		<- "";
@@ -158,7 +163,9 @@ global skills:[network]{
 		create cycling_way from:cycling_ways_shp;
 		
 		// Agentes Escenario 1
-		create roads from:s1_roads_shp;
+		create roads from:s1_roads_shp with: [
+		    lanes :: int(read("lanes"))
+		];
 		create aux_roads from:s1_aux_roads_shp with:[from_scenario::1, length::float(read("largo_m"))];
 		create aux_roads from:s2_aux_roads_shp with:[from_scenario::2, length::float(read("largo_m"))];
 		create blocks from:s1_blocks_shp with:[id::read("ID_BLOCK"),from_scenario::1,nb_people::int(read("POB1")),block_area::float(read("area_m2")),viv_type::read("TIPO_VIVIE"), nb_households::int(read("VIVTOTAL"))]{
@@ -192,7 +199,7 @@ global skills:[network]{
 		
 		create intersection from: vertices(roads_network);
 		ask intersection {
-			if flip(0.2) {
+			if flip(0.0) {
 				is_traffic_light <- true;
 				is_green <- true;
 				do setup_traffic_light;
@@ -206,6 +213,7 @@ global skills:[network]{
 		create vehicle number: 50 { type <- "bike"; }
 		
 		create economic_unit from:economic_activities_shp with:[from_scenario::1,activity_id::read("codigo_act"),sub_id::read("sec_sub")];
+		active_economic_units <- list(economic_unit); // Primera foto fija inicial
 		create equipment from:s1_equipment_shp with:[type::string(read("tipo_equip")),subtype::string(read("cat_sedeso")),from_scenario::1];
 		create green_area from:green_areas_shp with:[surface_area::float(read("area_m2"))];
 		create base_grid from:s1_grid_shp with:[night_diversity::float(read("ID_NOCHE")),day_diversity::float(read("ID_DIA")),knowledge_diversity::float(read("ID_CONOCIM")),from_scenario::1];
@@ -344,10 +352,10 @@ global skills:[network]{
 		do heatmap2populationdensity;
 	}
 
-	reflex emissions_evolution {
+	reflex emissions_evolution when:every(10 #cycle){
 		if (emissions_field != nil) {
 			emissions_field <- emissions_field * 0.88;
-			diffuse var: pollution on: emissions_field proportion: 0.75;
+			diffuse var: pollution on: emissions_field proportion: 0.7;
 		}
 	}
 
@@ -546,9 +554,9 @@ global skills:[network]{
 	float mean_diversity_day{
 		map<string,int> class_counter;
 		loop i over:day_activities{ add i::0 to:class_counter; }
-		list<economic_unit> my_tmp_activities <- economic_unit where(each.sub_id in day_activities);
-		if not empty(my_tmp_activities){
-			loop act over:my_tmp_activities{ class_counter[act.sub_id] <- class_counter[act.sub_id] + 1; }
+		list<economic_unit> valid_units <- active_economic_units where(not dead(each) and each.sub_id in day_activities);
+		if not empty(valid_units){
+			loop act over:valid_units{ class_counter[act.sub_id] <- class_counter[act.sub_id] + 1; }
 		}
 		int total_activities <- sum(class_counter.values);
 		return total_activities=0 ? 0.0 : -1*sum(class_counter.values collect((each/total_activities)*(each<=0?0:ln(each/total_activities))));
@@ -557,31 +565,31 @@ global skills:[network]{
 	float mean_diversity_night{
 		map<string,int> class_counter;
 		loop i over:night_activities{ add i::0 to:class_counter; }
-		list<economic_unit> my_tmp_activities <- economic_unit where(each.sub_id in night_activities);
-		if not empty(my_tmp_activities){
-			loop act over:my_tmp_activities{ class_counter[act.sub_id] <- class_counter[act.sub_id] + 1; }
+		list<economic_unit> valid_units <- active_economic_units where(not dead(each) and each.sub_id in night_activities);
+		if not empty(valid_units){
+			loop act over:valid_units{ class_counter[act.sub_id] <- class_counter[act.sub_id] + 1; }
 		}
 		int total_activities <- sum(class_counter.values);
 		return total_activities=0 ? 0.0 : -1*sum(class_counter.values collect((each/total_activities)*(each<=0?0:ln(each/total_activities))));
 	}
-	
+
 	float mean_diversity_knowledge{
 		map<string,int> class_counter;
 		loop i over:knowledge_activities{ add i::0 to:class_counter; }
-		list<economic_unit> my_tmp_activities <- economic_unit where(each.sub_id in knowledge_activities);
-		if not empty(my_tmp_activities){
-			loop act over:my_tmp_activities{ class_counter[act.sub_id] <- class_counter[act.sub_id] + 1; }
+		list<economic_unit> valid_units <- active_economic_units where(not dead(each) and each.sub_id in knowledge_activities);
+		if not empty(valid_units){
+			loop act over:valid_units{ class_counter[act.sub_id] <- class_counter[act.sub_id] + 1; }
 		}
 		int total_activities <- sum(class_counter.values);
 		return total_activities=0 ? 0.0 : -1*sum(class_counter.values collect((each/total_activities)*(each<=0?0:ln(each/total_activities))));
 	}
-	
+
 	float mean_diversity_interaction{
 		map<string,int> class_counter;
 		loop i over:interaction_places{ add i::0 to:class_counter; }
-		list<economic_unit> my_tmp_activities <- economic_unit where(each.sub_id in interaction_places);
-		if not empty(my_tmp_activities){
-			loop act over:my_tmp_activities{ class_counter[act.sub_id] <- class_counter[act.sub_id] + 1; }
+		list<economic_unit> valid_units <- active_economic_units where(not dead(each) and each.sub_id in interaction_places);
+		if not empty(valid_units){
+			loop act over:valid_units{ class_counter[act.sub_id] <- class_counter[act.sub_id] + 1; }
 		}
 		int total_activities <- sum(class_counter.values);
 		return total_activities=0 ? 0.0 : -1*sum(class_counter.values collect((each/total_activities)*(each<=0?0:ln(each/total_activities))));
@@ -764,13 +772,22 @@ global skills:[network]{
 		show_heatmap <- true;
 		ask ccu_heatmap{ grid_value <- 0.0; }
 		ask ref_grid{ do compute_population_living_inside; }
-		int max_population_living_in_grid <- max(ref_grid collect(each.people_living_inside));
+		
+		int max_pop <- max(ref_grid collect(each.people_living_inside));
+		
 		ask ref_grid{
-			ask heatmap inside(self){ grid_value <- max_population_living_in_grid > 0 ? myself.people_living_inside/max_population_living_in_grid : 0.0; }
+			ask heatmap inside(self){
+				if (max_pop > 0 and myself.people_living_inside > 0) {
+					float ratio <- myself.people_living_inside / max_pop;
+					// Aplicamos raíz cuadrada para dar visibilidad y color neón a las zonas medias/altas
+					grid_value <- min([1.0, sqrt(ratio)]); 
+				} else {
+					grid_value <- 0.0;
+				}
+			}
 		}
 		do spread_value(spread_value_factor);
-	}	
-
+	}
 	action heatmap2householddensity{
 		current_heatmap <- "household_density";
 		show_heatmap <- true;
@@ -828,35 +845,159 @@ global skills:[network]{
 	}
 
 	action spread_value(int it){
-		loop times:it{
-			ask ccu_heatmap{
+		// Obtener la geometría del límite de estudio de forma segura
+		geometry limit_geom <- empty(ccu_limit as list) ? world.shape : first(ccu_limit).shape;
+		
+		loop times: it {
+			ask ccu_heatmap {
 				list<heatmap> my_nb;
-				heatmap tmp <- heatmap[grid_x+1,grid_y]; if tmp != nil{ add tmp to:my_nb; }
-				tmp <- heatmap[grid_x+1,grid_y+1]; if tmp != nil{ add tmp to:my_nb; }
-				tmp <- heatmap[grid_x,grid_y+1]; if tmp != nil{ add tmp to:my_nb; }
-				tmp <- heatmap[grid_x-1,grid_y+1]; if tmp != nil{ add tmp to:my_nb; }
-				tmp <- heatmap[grid_x-1,grid_y]; if tmp != nil{ add tmp to:my_nb; }
-				tmp <- heatmap[grid_x-1,grid_y-1]; if tmp != nil{ add tmp to:my_nb; }
-				tmp <- heatmap[grid_x,grid_y-1]; if tmp != nil{ add tmp to:my_nb; }
-				tmp <- heatmap[grid_x+1,grid_y-1]; if tmp != nil{ add tmp to:my_nb; }
+				heatmap tmp <- heatmap[grid_x+1, grid_y]; if tmp != nil { add tmp to: my_nb; }
+				tmp <- heatmap[grid_x+1, grid_y+1]; if tmp != nil { add tmp to: my_nb; }
+				tmp <- heatmap[grid_x, grid_y+1]; if tmp != nil { add tmp to: my_nb; }
+				tmp <- heatmap[grid_x-1, grid_y+1]; if tmp != nil { add tmp to: my_nb; }
+				tmp <- heatmap[grid_x-1, grid_y]; if tmp != nil { add tmp to: my_nb; }
+				tmp <- heatmap[grid_x-1, grid_y-1]; if tmp != nil { add tmp to: my_nb; }
+				tmp <- heatmap[grid_x, grid_y-1]; if tmp != nil { add tmp to: my_nb; }
+				tmp <- heatmap[grid_x+1, grid_y-1]; if tmp != nil { add tmp to: my_nb; }
 				
-				grid_value <- grid_value*spread_factor + mean(my_nb where(not dead(each)) collect(each.grid_value))*(1-spread_factor);
-				if grid_value < 0.25{ grid_value <- grid_value * 1.20; }
-				else if grid_value < 0.5{ grid_value <- grid_value * 1.10; }
-				else if grid_value < 0.75{ grid_value <- grid_value * 1.05; }
+				grid_value <- grid_value * spread_factor + mean(my_nb where(not dead(each)) collect(each.grid_value)) * (1.0 - spread_factor);
 			}
 		}
-		ask ccu_heatmap {
+		
+		// Limpiar celdas fuera del polígono o con valores insignificantes
+		ask heatmap {
+			if (limit_geom != nil and not (limit_geom covers location)) or grid_value < 0.05 {
+				grid_value <- 0.0;
+			}
 			if (heatmap_field != nil) {
 				heatmap_field[self.location] <- self.grid_value;
 			}
+		}
+	}
+	// Variable para la lectura de comandos web
+	file commands_file <- nil;
+
+	// --- 1. REFLEX QUE LEE COMANDOS DESDE EL DASHBOARD WEB ---
+	reflex process_web_commands when: every(10#cycles) {
+		if (file_exists("../includes/data/commands.json")) {
+			try {
+				commands_file <- json_file("../includes/data/commands.json");
+				if (commands_file != nil and commands_file.contents != nil) {
+					map<string, unknown> cmd_data <- map<string, unknown>(commands_file.contents);
+					
+					if (cmd_data != nil and cmd_data contains_key "updated" and bool(cmd_data["updated"]) = true) {
+						// A. Ajustar cantidad de vehículos en tiempo real
+						if (cmd_data contains_key "vehicle_count" and cmd_data["vehicle_count"] != nil) {
+							int target_vehicles <- int(cmd_data["vehicle_count"]);
+							int current_vehicles <- length(vehicle);
+							int diff <- target_vehicles - current_vehicles;
+							
+							if (diff > 0) {
+								create vehicle number: diff { type <- "car"; }
+								write "=== [CityScope] Creados " + string(diff) + " vehículos adicionales ===";
+							} else if (diff < 0) {
+								int nb_to_kill <- min([abs(diff), current_vehicles]);
+								loop times: nb_to_kill {
+									if (!empty(vehicle)) { ask one_of(vehicle) { do die; } }
+								}
+								write "=== [CityScope] Eliminados " + string(nb_to_kill) + " vehículos ===";
+							}
+						}
+						
+						// B. Cambiar capa activa de visualización
+						string layer <- "emissions";
+						if (cmd_data contains_key "active_layer" and cmd_data["active_layer"] != nil) {
+							layer <- string(cmd_data["active_layer"]);
+							if (layer = "emissions") { show_emissions <- true; show_heatmap <- false; }
+							else if (layer = "population") { show_emissions <- false; do heatmap2populationdensity; }
+							else if (layer = "day_div") { show_emissions <- false; do heatmap2daydiv; }
+						}
+
+						// C. Cambiar Escenario Urbano (S1 o S2)
+						int sc_val <- 1;
+						if (cmd_data contains_key "active_scenario" and cmd_data["active_scenario"] != nil) {
+							sc_val <- int(cmd_data["active_scenario"]);
+							if (sc_val = 1) {
+								do activate_scenario1;
+								write "=== [CityScope] Activado Escenario 1 (Base/Actual) ===";
+							} else if (sc_val = 2) {
+								do activate_scenario2;
+								write "=== [CityScope] Activado Escenario 2 (Plan Maestro/Futuro) ===";
+							}
+						}
+						
+						// D. Guardar la respuesta directamente como string limpio (SIN CORCHETES [])
+						string json_out <- '{"vehicle_count":' + string(length(vehicle)) + ',"active_layer":"' + layer + '","active_scenario":' + string(sc_val) + ',"updated":false}';
+						save json_out to: "../includes/data/commands.json" format: "text" rewrite: true;
+					}
+				}
+			} catch {
+				// Captura silenciosa si el archivo se estaba escribiendo al mismo tiempo
+			}
+		}
+	}
+	// --- 2. EXPORTACIÓN DE INDICADORES Y MATRIZ DE EMISIONES ---
+	// --- EXPORTACIÓN ROBUSTA DE INDICADORES Y EMISIONES ---
+	reflex update_and_export_indicators when: allow_export_current_data or scenario_changed or (every(30#cycles) and allow_export_data) {
+		if (time_2_save_data > 0) {
+			time_2_save_data <- time_2_save_data - 1;
+		} else {
+			// A. Exportar CSV en 2 filas explícitas con salto de línea (\n)
+			string header_s1 <- "dash_night_activities_diversity0,dash_interaction_diversity0,dash_knowledge_activities_diversity0,dash_energy_requirement0,dash_water_requirement0,dash_waste_generation0,dash_green_space_per_hab0,dash_km_ways_per_hab0,dash_public_transport_coverage0,dash_mean_facilities_proximity0,dash_mean_activities_density0,dash_hab_net_density0,dash_living_place_density0,dash_day_activities_diversity0";
+			string row_s1 <- string(mean_diversity_night()) + "," + 
+			                 string(mean_diversity_interaction()) + "," + 
+			                 string(mean_diversity_knowledge()) + "," + 
+			                 string(mean_energy_requirement()) + "," + 
+			                 string(mean_water_requirement()) + "," + 
+			                 string(mean_waste_generation()) + ",0.70," + 
+			                 string(km_roads_per_person(1)) + "," + 
+			                 string(mean_education_proximity()) + "," + 
+			                 string(mean_culture_proximity()) + ",0.38," + 
+			                 string(mean_population_density()) + "," + 
+			                 string(mean_household_density()) + "," + 
+			                 string(mean_diversity_day());
+
+			save (header_s1 + "\n" + row_s1) to: "../includes/data/output_s1.csv" format: "csv" rewrite: true;
+
+			// B. Construir JSON de Emisiones con velocidad saneada
+			float safe_speed <- (vehicle = nil or empty(vehicle) or avg_speed = nil) ? 0.0 : float(avg_speed) * 3.6;
+
+			list<string> json_cells <- [];
+			ask vehicle {
+				if (self != nil and self.location != nil) {
+					add '{"x":' + string(self.location.x) + ',"y":' + string(self.location.y) + '}' to: json_cells;
+				}
+			}
+			
+			string points_str <- "";
+			int total_pts <- length(json_cells);
+			if (total_pts > 0) {
+				loop i from: 0 to: total_pts - 1 {
+					points_str <- points_str + json_cells[i] + (i < total_pts - 1 ? "," : "");
+				}
+			}
+			
+			string json_emissions <- to_json([
+			    "vehicles_count":: length(vehicle),
+			    "avg_speed":: (empty(vehicle) ? 0.0 : mean(vehicle collect each.speed) * 3.6),
+			    "points":: (vehicle collect [
+			        "lat":: CRS_transform(each.location, "EPSG:4326").location.y,
+			        "lng":: CRS_transform(each.location, "EPSG:4326").location.x
+			    ])
+			]);
+			
+			// Guardar como type: "text" para evitar doble escapado de comillas
+			save json_emissions to: "../includes/data/emissions_data.json" format: "json";
+			
+			allow_export_current_data <- false;
+			scenario_changed <- false;
 		}
 	}
 }
 
 // ------------------ ESPECIES DE SIMULACION DE TRAFICO Y EMISIONES ------------------
 
-species vehicle skills:[moving]{
+species vehicle skills: [moving] {
 	point tgt;
 	float current_speed;
 	float accel_rate;
@@ -870,22 +1011,26 @@ species vehicle skills:[moving]{
 	// Monitoreo de estancamiento e inmovilidad
 	point last_location <- nil;
 	int stuck_counter <- 0;
+	int failed_target_attempts <- 0;
+	intersection current_token_intersection <- nil;
+	bool is_crossing <- false;
+	intersection current_inter <- nil;
 	
-	init{
+	init {
 		min_gap <- 8.0;
-		if(type = "car"){
+		if (type = "car") {
 			accel_rate <- 0.15;
 			max_speed <- 50.0#km/#h;
 			emission_rate <- 12.0;
-		} else if(type = "moto"){
+		} else if (type = "moto") {
 			accel_rate <- 0.3;
 			max_speed <- 40.0#km/#h;
 			emission_rate <- 6.0;
-		} else if(type = "bus"){
+		} else if (type = "bus") {
 			accel_rate <- 0.08;
 			max_speed <- 30.0#km/#h;
 			emission_rate <- 28.0;
-		} else if(type = "bike"){
+		} else if (type = "bike") {
 			accel_rate <- 0.05;
 			max_speed <- 20.0#km/#h;
 			emission_rate <- 0.0;
@@ -895,6 +1040,7 @@ species vehicle skills:[moving]{
 			emission_rate <- 10.0;
 		}
 		
+		// NOTA: Si tu especie de vías se llama 'road' en singular, usa 'road' en lugar de 'roads'
 		list<roads> valid_roads <- roads_network.edges collect roads(each);
 		if (!empty(valid_roads)) {
 			location <- any_location_in(one_of(valid_roads));
@@ -902,23 +1048,39 @@ species vehicle skills:[moving]{
 		do select_new_target;
 	}
 	
+	// Selección de destino con validación estricta de ruta
 	action select_new_target {
 		tgt <- nil;
 		int attempts <- 0;
 		list<roads> valid_roads <- roads_network.edges collect roads(each);
 		if (empty(valid_roads)) { return; }
 		
-		loop while: (tgt = nil and attempts < 10) {
+		loop while: (tgt = nil and attempts < 15) {
 			point candidate <- any_location_in(one_of(valid_roads));
 			path test_path <- path_between(roads_network, location, candidate);
 			if (test_path != nil and length(test_path.edges) > 0) {
 				tgt <- candidate;
+				failed_target_attempts <- 0;
 			}
 			attempts <- attempts + 1;
 		}
 		
 		if (tgt = nil) {
-			tgt <- any_location_in(one_of(valid_roads));
+			failed_target_attempts <- failed_target_attempts + 1;
+			if (failed_target_attempts >= 2) {
+				do handle_trapped_agent;
+			}
+		}
+	}
+
+	// Reubicación de emergencia para vehículos atrapados
+	action handle_trapped_agent {
+		list<roads> valid_roads <- roads_network.edges collect roads(each);
+		if (!empty(valid_roads)) {
+			location <- any_location_in(one_of(valid_roads));
+			failed_target_attempts <- 0;
+			stuck_counter <- 0;
+			do select_new_target;
 		}
 	}
 	
@@ -926,31 +1088,45 @@ species vehicle skills:[moving]{
 		if (tgt = nil or location distance_to tgt < 5.0) {
 			do select_new_target;
 			stuck_counter <- 0;
+			is_crossing <- false;
 		}
 
-		// 1. Detección de vehículo frontal en el mismo sentido
-		list<vehicle> vehicles_ahead <- vehicle at_distance 35.0
-			select(each != self and 
-				abs(self.heading - (self.location direction_to each.location)) < 30.0 and
-				(abs(self.heading - each.heading) > 180 ? 360 - abs(self.heading - each.heading) : abs(self.heading - each.heading)) < 60.0
-			);
+		// Obtener el tramo de calle actual sobre el que circula el vehículo
+		roads current_rd <- current_edge != nil ? roads(current_edge) : nil;
+		int num_lanes <- current_rd != nil ? current_rd.lanes : 1;
+
+		// 1. Detección adaptativa de vehículo frontal según el número de carriles
+		// En calles de más de 1 carril se reduce el cono de visión (de 40° a 20°) para no frenar por autos en carriles paralelos
+		float angle_threshold <- (num_lanes > 1) ? 20.0 : 40.0;
+		
+		list<vehicle> vehicles_ahead <- vehicle at_distance 20.0 select (
+			each != self and 
+			abs(self.heading - (self.location direction_to each.location)) < angle_threshold and
+			(abs(self.heading - each.heading) < 50.0 or abs(self.heading - each.heading) > 310.0)
+		);
 		vehicle vehicle_ahead <- vehicles_ahead closest_to self;
 		
 		// 2. Detección de semáforo en rojo
-		list<intersection> traffic_lights_ahead <- intersection at_distance 25.0
-			select(each.is_traffic_light and
-				abs(self.heading - (self.location direction_to each.location)) < 30.0 and
-				not each.is_green
-			);
+		list<intersection> traffic_lights_ahead <- intersection at_distance 20.0 select (
+			each.is_traffic_light and
+			abs(self.heading - (self.location direction_to each.location)) < 35.0 and
+			not each.is_green
+		);
 		intersection traffic_light_ahead <- traffic_lights_ahead closest_to self;
 		
-		// 3. Detección de intersección próxima sin semáforo
-		intersection next_intersection <- intersection at_distance 25.0 closest_to self;
-		if (next_intersection != nil and next_intersection.is_traffic_light) {
-			next_intersection <- nil;
-		}
-		
+		// 3. Detección de Intersección Próxima sin semáforo
+		intersection next_inter <- intersection at_distance 20.0 select (
+			not each.is_traffic_light and 
+			abs(self.heading - (self.location direction_to each.location)) < 60.0
+		) closest_to self;
+
+		// Ajustar velocidad máxima según el tipo de vehículo y la capacidad de la vía
 		float max_speed_allowed <- max_speed;
+		if (num_lanes >= 3) {
+			max_speed_allowed <- max_speed * 1.15; // Vías rápidas/troncales
+		} else if (num_lanes = 1) {
+			max_speed_allowed <- min(max_speed, 35.0#km/#h); // Calles residenciales / 1 carril
+		}
 		
 		// 4. Frenado por vehículo adelante
 		if (vehicle_ahead != nil) {
@@ -968,36 +1144,47 @@ species vehicle skills:[moving]{
 			max_speed_allowed <- min(max_speed_allowed, speed_limit_tl);
 		}
 		
-		// 6. Control de cruce sin semáforo con regla "No Bloquear la Salida"
-		if (next_intersection != nil) {
-			float dist_to_inter <- self distance_to next_intersection;
-			
-			if (dist_to_inter <= 20.0 and dist_to_inter > 2.0) {
-				if (not (next_intersection.waiting_queue contains self) and next_intersection.active_vehicle != self) {
-					add self to: next_intersection.waiting_queue;
-				}
-				
-				// Salida bloqueada si el vehículo de adelante está parado justo al salir del cruce
-				bool exit_blocked <- (vehicle_ahead != nil and (vehicle_ahead distance_to next_intersection) < 12.0 and vehicle_ahead.current_speed < 1.0 #km/#h);
+		// 6. Control de Intersección / Ceda el Paso
+		if (next_inter != nil) {
+			float my_dist <- self distance_to next_inter;
 
-				if ((next_intersection.active_vehicle != self or exit_blocked) and stuck_counter < 10) {
-					float max_advance_i <- max(0.0, dist_to_inter - 3.5);
+			if (my_dist <= 4.0) {
+				is_crossing <- true;
+			}
+
+			if (not is_crossing and my_dist <= 15.0 and my_dist > 4.0) {
+				list<vehicle> rivals <- vehicle at_distance 15.0 select (
+					each != self and
+					(each distance_to next_inter) < 10.0
+				);
+
+				bool should_yield <- false;
+				loop r over: rivals {
+					if (r.stuck_counter > 20) { continue; }
+
+					float r_dist <- r distance_to next_inter;
+					if (r.is_crossing or r_dist < (my_dist - 0.5) or (abs(r_dist - my_dist) <= 0.5 and int(r) < int(self))) {
+						should_yield <- true;
+						break;
+					}
+				}
+
+				bool exit_blocked <- (vehicle_ahead != nil and (vehicle_ahead distance_to next_inter) < 7.0 and vehicle_ahead.current_speed < 1.0 #km/#h);
+
+				if (should_yield or exit_blocked) {
+					float max_advance_i <- max(0.0, my_dist - 3.5);
 					float speed_limit_i <- max_advance_i * 3.6 #km/#h;
 					max_speed_allowed <- min(max_speed_allowed, speed_limit_i);
 				}
 			}
+		} else {
+			is_crossing <- false;
 		}
 		
-		// 7. DESBLOQUEO FORZADO (Rompe-gridlocks en caso de estancamiento circular)
-		if (stuck_counter > 10) {
-			// Ignorar restricciones de encolado para forzar la disolución del estancamiento
-			max_speed_allowed <- max(3.0 #km/#h, max_speed_allowed);
-			if (next_intersection != nil) {
-				next_intersection.waiting_queue <- next_intersection.waiting_queue - self;
-				if (next_intersection.active_vehicle = self) {
-					next_intersection.active_vehicle <- nil;
-				}
-			}
+		// 7. DESBLOQUEO DE EMERGENCIA
+		if (stuck_counter > 30) {
+			max_speed_allowed <- max(8.0 #km/#h, max_speed_allowed);
+			is_crossing <- true;
 		}
 		
 		// 8. Ajuste dinámico de velocidad
@@ -1009,16 +1196,19 @@ species vehicle skills:[moving]{
 			current_speed <- min(max_speed_allowed, current_speed + accel_rate);
 		}
 		
-		// 9. Desplazamiento
+		// 9. Desplazamiento y verificación de ruta
 		if (current_speed > 0.0 and tgt != nil) {
 			path path_followed <- goto(target: tgt, on: roads_network, return_path: true, speed: current_speed);
-			if (emission_rate > 0 and emissions_field != nil) {
+			
+			if (path_followed = nil or length(path_followed.edges) = 0) {
+				do select_new_target;
+			} else if (emission_rate > 0 and emissions_field != nil) {
 				emissions_field[self.location] <- emissions_field[self.location] + emission_rate;
 				total_emissions_generated <- total_emissions_generated + emission_rate;
 			}
 		}
 		
-		// 10. Evaluación Global de Movimiento Efectivo (Incluso si velocidad es 0)
+		// 10. Control de inmovilidad / re-enrutamiento
 		if (last_location != nil and location distance_to last_location < 0.2) {
 			stuck_counter <- stuck_counter + 1;
 		} else {
@@ -1026,18 +1216,18 @@ species vehicle skills:[moving]{
 		}
 		last_location <- copy(location);
 		
-		// Si permanece atorado por más de 25 pasos, re-enrutar destino
-		if (stuck_counter > 25) {
+		if (stuck_counter > 50) {
 			stuck_counter <- 0;
+			is_crossing <- false;
 			do select_new_target;
 		}
 	}
-
+	
 	reflex update_wasted_time {
-		if(current_speed <= 0 and not is_stopped){
+		if (current_speed <= 0 and not is_stopped) {
 			wasted_time <- 0;
 			is_stopped <- true;
-		} else if(current_speed <= 0 and is_stopped){
+		} else if (current_speed <= 0 and is_stopped) {
 			wasted_time <- wasted_time + int(step);
 		} else {
 			wasted_time <- 0;
@@ -1047,14 +1237,15 @@ species vehicle skills:[moving]{
 	
 	aspect default {
 		rgb v_color <- #gray;
-		if(type = "car") { v_color <- (current_speed <= 2.0#km/#h) ? #red : #blue; }
-		else if(type = "bus") { v_color <- #purple; }
-		else if(type = "moto") { v_color <- #orange; }
-		else if(type = "bike") { v_color <- #green; }
+		if (type = "car") { v_color <- (current_speed <= 2.0#km/#h) ? #red : #blue; }
+		else if (type = "bus") { v_color <- #purple; }
+		else if (type = "moto") { v_color <- #orange; }
+		else if (type = "bike") { v_color <- #green; }
 		
 		draw triangle(10) color: v_color border: #black rotate: heading + 90;
 	}
 }
+
 
 species intersection {
 	int counter <- 0;
@@ -1105,7 +1296,30 @@ species intersection {
 			waiting_queue <- waiting_queue - active_vehicle;
 		}
 	}
-	
+	// --- LÓGICA DE NEGOCIACIÓN DE CRUCE ---
+    vehicle active_token_holder <- nil;
+    list<vehicle> intersection_queue <- [];
+
+    // Un vehículo solicita permiso para cruzar
+    action request_token (vehicle v) {
+        if (active_token_holder = nil or active_token_holder = v) {
+            active_token_holder <- v;
+        } else if (!(intersection_queue contains v)) {
+            add v to: intersection_queue;
+        }
+    }
+
+    // El vehículo libera la intersección al salir de ella
+    action release_token (vehicle v) {
+        if (active_token_holder = v) {
+            if (length(intersection_queue) > 0) {
+                active_token_holder <- first(intersection_queue);
+                remove active_token_holder from: intersection_queue;
+            } else {
+                active_token_holder <- nil;
+            }
+        }
+    }
 	aspect default {
 		if is_traffic_light {
 			draw circle(8) color: is_green ? #green : #red border: #white;
@@ -1178,6 +1392,8 @@ species project{
 			ask new_unit_{ location <- any_location_in (my_block); }
 			add first(new_unit) to:my_new_activities;
 		}
+		// Agregar las nuevas actividades a la lista global segura
+		active_economic_units <- active_economic_units + my_new_activities;
 	}
 	
 	action activate{
@@ -1202,7 +1418,11 @@ species project{
 		}
 	}
 	action deactivate{
+		// Remover las actividades de la lista global ANTES de destruirlas en la memoria
+		active_economic_units <- active_economic_units - my_new_activities;
 		ask my_new_activities{ do die; }
+		my_new_activities <- [];
+		
 		ask new_people { to_be_killed <- true; }
 		list<blocks> blocks_tbr <- current_active_blocks where(each.id=block_id);
 		ask blocks_tbr{
@@ -1242,7 +1462,7 @@ species intervention_area{
 				ask associated_projects where(each.from_scenario=new_scenario){ do activate; }
 			}
 			scenario_changed <- true;
-			time_2_save_data <- delay_before_export_data;
+			time_2_save_data <- max([3, delay_before_export_data]); // Garantiza mínimo 3 ciclos de asentamiento
 			time_2_update_heatmap <- delay_before_update_heatmap;
 			allow_export_current_data <- true;
 			active_scenario <- new_scenario;
@@ -1442,7 +1662,7 @@ species blocks{
 	
 	aspect default{
 		if self in current_active_blocks and not show_satellite{
-			draw shape color:rgb(100,100,100,0.2) border:#blue width:5.0;
+			draw shape color:rgb(100,100,100,0.2)  width:5.0;
 		}
 	}
 }
@@ -1457,6 +1677,7 @@ species household{
 }
 
 species roads{
+	int lanes <- 1;
 	aspect default{ draw shape color:#gray; }
 }
 
@@ -1594,19 +1815,19 @@ experiment CCU_1_1000 type:gui autorun:true{
 			}
 			
 			species satellite_background aspect:default refresh:true;
-			species ccu_limit aspect:default refresh:true;
+			//species ccu_limit aspect:default refresh:true;
 			species blocks aspect:default;
-			species roads aspect:default;
+			//species roads aspect:default;
 			species intersection aspect:default;
 			species vehicle aspect:default;
 			species people aspect:default;
 			species intervention_area aspect:default;
 			
 			mesh heatmap_field 
-				scale: 5.0 
+				scale: 8.0 
 				triangulation: true 
-				transparency: 0.35 
-				smooth: 3 
+				transparency: 0.30 
+				smooth: 2 
 				color: heatmap_palette 
 				visible: show_heatmap and not show_emissions;
 				
@@ -1655,11 +1876,11 @@ experiment CCU_1_1000 type:gui autorun:true{
 			event "I" { ask simulation { do change_scenario_I; } }
 		}
 		
-		display "Monitoreo de Trafico" type: 2d {
+		/*display "Monitoreo de Trafico" type: 2d {
 			chart "Metricas de Movilidad Vehicular" type: series {
 				data "Velocidad Promedio (km/h)" color: #green value: avg_speed * 3.6;
 				data "Tiempo Perdido en Embotellamiento (s)" color: #red value: avg_wasted_time;
 			}
-		}
+		}*/
 	}
 }

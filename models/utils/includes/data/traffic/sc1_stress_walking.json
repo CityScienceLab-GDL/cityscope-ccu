@@ -1,0 +1,28 @@
+{
+  "scenario_metadata": {
+    "scenario_group": "Escenario 1",
+    "description": "Prueba de Estrés: Caminata hacia BRT/L3 (10.8k peatonas) - Viernes 23:00 hrs",
+    "mode": "WALK",
+    "timestamp_str": "N/A"
+  },
+  "results": [
+    {
+      "origin_id": "ORIGIN_ESTADIO",
+      "dest_id": "DEST_BRT_CCU",
+      "distance_m": 457,
+      "duration_sec": 376.0
+    },
+    {
+      "origin_id": "ORIGIN_ESTADIO",
+      "dest_id": "DEST_BRT_CONST",
+      "distance_m": 625,
+      "duration_sec": 534.0
+    },
+    {
+      "origin_id": "ORIGIN_ESTADIO",
+      "dest_id": "DEST_L3_MMAR",
+      "distance_m": 1907,
+      "duration_sec": 1616.0
+    }
+  ]
+}
