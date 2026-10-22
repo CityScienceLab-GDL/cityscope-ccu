@@ -457,7 +457,7 @@
     }
 
     // 2. MAPA LEAFLET + CAPA DE HEATMAP
-    const map = L.map('map2d', { zoomControl: false }).setView([20.738, -103.377], 15);
+    const map = L.map('map2d', { zoomControl: false }).setView([20.735809556208967, -103.3833678083894], 15);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap contributors',
@@ -483,10 +483,6 @@
     let customRouteLayerGroup = L.layerGroup().addTo(map);
     let nodeMarkersGroup = L.layerGroup().addTo(map);
 
-    L.polygon([
-      [20.744, -103.382], [20.744, -103.370],
-      [20.732, -103.370], [20.732, -103.382]
-    ], { color: '#00f3ff', weight: 1.5, dashArray: '4, 4', fillColor: '#00bfff', fillOpacity: 0.05 }).addTo(map);
 
     function renderNodeMarkers() {
       nodeMarkersGroup.clearLayers();
