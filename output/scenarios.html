@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel de Control de Movilidad en Eventos 3D</title>
+  
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- MAPLIBRE GL JS (MOTOR 3D WEBGL) -->
+  <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+  <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+
+  <style>
+    :root {
+      --bg-black: #030712;
+      --card-bg: #0b0f19;
+      --border-color: rgba(255, 255, 255, 0.15);
+      --cyan-tech: #00e5ff;
+      --green-mit: #00ff9d;
+      --orange-mit: #ff9900;
+      --red-mit: #ff3366;
+      --text-muted: #a1a1aa;
+      --font-mono: 'Space Mono', monospace;
+      --font-sans: 'Inter', sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg-black); color: #fff; font-family: var(--font-sans); height: 100vh; display: flex; flex-direction: column; padding: 12px; overflow: hidden; }
+
+    header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 10px; }
+    .header-left { display: flex; align-items: center; gap: 14px; }
+    
+    .logo-cslab { height: 54px; border-radius: 6px; border: 1px solid var(--border-color); object-fit: contain; background: rgba(255,255,255,0.02); padding: 2px; }
+    .title { font-family: var(--font-mono); font-size: 1.25rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 12px; }
+    .tag { background: rgba(0, 229, 255, 0.15); border: 1px solid var(--cyan-tech); color: var(--cyan-tech); font-size: 0.72rem; padding: 3px 8px; border-radius: 4px; font-weight: 700; }
+
+    .header-controls { display: flex; align-items: center; gap: 12px; }
+    
+    .clock-box { 
+      background: rgba(0, 229, 255, 0.08); 
+      border: 1px solid var(--cyan-tech); 
+      border-radius: 6px; 
+      padding: 6px 18px; 
+      display: flex; 
+      align-items: center; 
+      font-family: var(--font-mono); 
+      color: var(--cyan-tech); 
+      font-weight: 700; 
+      font-size: 1.6rem; 
+      letter-spacing: 1.5px;
+      box-shadow: 0 0 14px rgba(0, 229, 255, 0.2);
+    }
+    
+    .phase-toggle { display: flex; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); border-radius: 6px; padding: 3px; gap: 4px; }
+    .btn-phase { background: transparent; border: 1px solid transparent; color: var(--text-muted); padding: 6px 14px; font-family: var(--font-mono); font-size: 0.8rem; font-weight: 700; border-radius: 4px; cursor: pointer; transition: 0.2s; }
+    .btn-phase.active-arribo { background: rgba(0, 229, 255, 0.25); color: var(--cyan-tech); border-color: var(--cyan-tech); box-shadow: 0 0 10px rgba(0,229,255,0.2); }
+    .btn-phase.active-desalojo { background: rgba(255, 51, 102, 0.25); color: var(--red-mit); border-color: var(--red-mit); box-shadow: 0 0 10px rgba(255,51,102,0.2); }
+
+    /* KPIS TOP BAR */
+    .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 10px; }
+    .kpi-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; }
+    .kpi-label { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; }
+    .kpi-val { font-family: var(--font-mono); font-size: 1.45rem; font-weight: 700; margin-top: 4px; margin-bottom: 4px; }
+    .badge { font-size: 0.7rem; padding: 3px 8px; border-radius: 4px; font-weight: 700; font-family: var(--font-mono); display: inline-block; }
+    .bg-danger { background: rgba(255, 51, 102, 0.2); color: var(--red-mit); border: 1px solid var(--red-mit); }
+    .bg-warning { background: rgba(255, 153, 0, 0.2); color: var(--orange-mit); border: 1px solid var(--orange-mit); }
+    .bg-success { background: rgba(0, 255, 157, 0.2); color: var(--green-mit); border: 1px solid var(--green-mit); }
+    .bg-info { background: rgba(0, 229, 255, 0.2); color: var(--cyan-tech); border: 1px solid var(--cyan-tech); }
+
+    /* LAYOUT PRINCIPAL */
+    .main-grid { display: grid; grid-template-columns: 1.15fr 1.15fr; gap: 10px; height: calc(100vh - 155px); }
+    .panel { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; position: relative; }
+    .panel-title { font-family: var(--font-mono); font-size: 0.85rem; color: var(--cyan-tech); text-transform: uppercase; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+
+    .btn-group { display: flex; gap: 6px; margin-top: 2px; }
+    .btn-cmd { flex: 1; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); color: #fff; padding: 8px 10px; font-size: 0.78rem; font-family: var(--font-mono); border-radius: 6px; cursor: pointer; transition: 0.2s; text-align: center; }
+    .btn-cmd.active { background: rgba(0, 229, 255, 0.2); border-color: var(--cyan-tech); color: var(--cyan-tech); font-weight: 700; box-shadow: 0 0 10px rgba(0,229,255,0.2); }
+    .btn-reset { flex: 0 0 auto; background: rgba(255, 51, 102, 0.15); border: 1px solid var(--red-mit); color: var(--red-mit); padding: 8px 12px; font-size: 0.9rem; }
+
+    .modal-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 2px; }
+    .modal-card { background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 4px; text-align: center; }
+    .modal-icon { font-size: 1.25rem; margin-bottom: 2px; }
+    .modal-name { font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono); font-weight: 700; }
+    .modal-count { font-family: var(--font-mono); font-size: 1.05rem; font-weight: 700; color: #fff; margin-top: 2px; }
+    .modal-pct { font-size: 0.7rem; color: var(--cyan-tech); font-family: var(--font-mono); font-weight: 700; }
+
+    /* SELECTOR DE CAPAS MAPA */
+    .map-layer-selector {
+      position: absolute; top: 10px; right: 10px; z-index: 1000;
+      display: flex; gap: 4px; background: rgba(11, 15, 25, 0.92);
+      border: 1px solid var(--cyan-tech); padding: 4px; border-radius: 8px;
+      backdrop-filter: blur(8px);
+    }
+    .btn-map-mode {
+      background: transparent; border: 1px solid transparent; color: var(--text-muted);
+      padding: 5px 10px; font-family: var(--font-mono); font-size: 0.72rem; font-weight: 700;
+      border-radius: 4px; cursor: pointer; transition: 0.2s; white-space: nowrap;
+    }
+    .btn-map-mode:hover { color: #fff; }
+    .btn-map-mode.active {
+      background: rgba(0, 229, 255, 0.2); border-color: var(--cyan-tech); color: var(--cyan-tech);
+    }
+
+    .map-legend-box {
+      position: absolute; bottom: 15px; left: 15px; z-index: 1000;
+      background: rgba(11, 15, 25, 0.94); border: 1px solid var(--border-color);
+      padding: 12px 16px; border-radius: 8px; backdrop-filter: blur(8px);
+      font-family: var(--font-mono); font-size: 0.78rem; color: #fff;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.7); min-width: 220px;
+    }
+    .legend-title {
+      font-size: 0.8rem; font-weight: 700; color: var(--cyan-tech);
+      margin-bottom: 6px; text-transform: uppercase;
+      border-bottom: 1px solid rgba(255,255,255,0.15); padding-bottom: 4px;
+    }
+    .legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 0.75rem; }
+    .legend-item:last-child { margin-bottom: 0; }
+    .legend-color-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.4); }
+    .legend-gradient-bar {
+      height: 8px; width: 100%; border-radius: 4px; margin: 6px 0 3px 0;
+      background: linear-gradient(to right, #002244, #00ff9d, #ffff00, #ff9900, #ff3366);
+    }
+    .legend-scale-labels { display: flex; justify-content: space-between; font-size: 0.65rem; color: var(--text-muted); }
+
+    #map { width: 100%; height: 100%; border-radius: 6px; border: 1px solid var(--border-color); background: #050811; }
+
+    .parking-pin-badge {
+      display: flex; align-items: center; justify-content: center; gap: 3px;
+      padding: 4px 7px; border-radius: 4px; font-family: var(--font-mono);
+      font-size: 11px; font-weight: 700; color: #ffffff;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.9); border: 1px solid rgba(255, 255, 255, 0.5);
+      cursor: pointer; white-space: nowrap; transition: transform 0.2s ease;
+    }
+    .parking-pin-badge:hover { transform: scale(1.2); z-index: 999; }
+
+    .maplibregl-popup-content {
+      background: #0b0f19 !important; border: 1px solid var(--cyan-tech) !important;
+      color: #ffffff !important; font-family: var(--font-mono) !important;
+      font-size: 12px !important; border-radius: 6px !important; padding: 8px 12px !important;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.9) !important;
+    }
+    .maplibregl-popup-anchor-bottom .maplibregl-popup-tip { border-top-color: var(--cyan-tech) !important; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-left">
+      <img src="../includes/img/cslab.png" alt="CSLab Logo" class="logo-cslab" onerror="this.src='includes/img/cslab.png'">
+      <div class="title">
+        <span>PANEL DE CONTROL DE MOVILIDAD EN EVENTOS</span>
+        <span class="tag">ESTUDIO DE IMPACTO VIAL 3D</span>
+      </div>
+    </div>
+
+    <div class="header-controls">
+      <div class="phase-toggle">
+        <button class="btn-phase active-arribo" id="btn-mode-arribo" onclick="setPhaseMode('arribo')">📥 ARRIBO (19:00h)</button>
+        <button class="btn-phase" id="btn-mode-desalojo" onclick="setPhaseMode('desalojo')">📤 DESALOJO (23:00h)</button>
+      </div>
+
+      <div class="clock-box">
+        <span id="simulated-clock-val">19:00:00</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">Ocupación Estacionamiento</div>
+      <div class="kpi-val" id="kpi-parking-val">0%</div>
+      <span class="badge bg-danger" id="kpi-parking-badge">0 / 0 Cajones</span>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Velocidad Flujo Polígono</div>
+      <div class="kpi-val" id="kpi-speed-val">0.0 km/h</div>
+      <span class="badge bg-info" id="kpi-speed-badge">Calculando</span>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Factor de Retraso (LOS)</div>
+      <div class="kpi-val" id="kpi-delay-val">1.0x</div>
+      <span class="badge bg-success" id="kpi-delay-badge">LOS A-B (Flujo Libre)</span>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label" id="kpi-people-label">Personas en Recinto</div>
+      <div class="kpi-val" id="kpi-arrived-val">0 / 40k</div>
+      <span class="badge bg-warning" id="kpi-people-badge">0 en camino</span>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Estrategia Activa</div>
+      <div class="kpi-val" id="kpi-strategy-val" style="font-size:1.1rem; color:var(--cyan-tech);">Escenario A</div>
+      <span class="badge bg-danger" id="kpi-strategy-badge">Base Vehicular</span>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <div class="panel">
+      <div>
+        <div class="panel-title" style="margin-bottom:4px;">COMPARATIVA DE ESCENARIOS ESTRATÉGICOS</div>
+        <div class="btn-group">
+          <button class="btn-cmd active" id="btn-sc1" onclick="setScenario(1)">
+            <div><strong>Escenario A: Sin Mitigación</strong></div>
+            <div style="font-size:0.65rem; color:var(--text-muted);">Dominante Auto (68% Vehicular)</div>
+          </button>
+          <button class="btn-cmd" id="btn-sc2" onclick="setScenario(2)">
+            <div><strong>Escenario B: Plan Intermodal</strong></div>
+            <div style="font-size:0.65rem; color:var(--text-muted);">Transporte Público + Park & Ride</div>
+          </button>
+          <button class="btn-cmd btn-reset" onclick="resetSimulation()" title="Reiniciar Simulación">🔄</button>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel-title" style="margin-bottom: 4px;" id="modal-split-title">DESGLOSE DE ARRIBO AL ESTADIO POR MODO</div>
+        <div class="modal-grid">
+          <div class="modal-card"><div class="modal-icon">🚗</div><div class="modal-name">Coche</div><div class="modal-count" id="m-car-cnt">0</div><div class="modal-pct" id="m-car-pct">0%</div></div>
+          <div class="modal-card"><div class="modal-icon">🚌</div><div class="modal-name">Mi Macro</div><div class="modal-count" id="m-macro-cnt">0</div><div class="modal-pct" id="m-macro-pct">0%</div></div>
+          <div class="modal-card"><div class="modal-icon">🚆</div><div class="modal-name">Línea 3</div><div class="modal-count" id="m-l3-cnt">0</div><div class="modal-pct" id="m-l3-pct">0%</div></div>
+          <div class="modal-card"><div class="modal-icon">🚲</div><div class="modal-name">Bici</div><div class="modal-count" id="m-bike-cnt">0</div><div class="modal-pct" id="m-bike-pct">0%</div></div>
+          <div class="modal-card"><div class="modal-icon">🚶</div><div class="modal-name">Peatón</div><div class="modal-count" id="m-walk-cnt">0</div><div class="modal-pct" id="m-walk-pct">0%</div></div>
+        </div>
+      </div>
+
+      <div style="flex-grow:1; display:flex; flex-direction:column; gap:4px;">
+        <div class="panel-title">
+          <span>PERFIL COMPARATIVO EMPÍRICO</span>
+          <span style="font-size:0.68rem; color:var(--cyan-tech);" id="radar-scenario-tag">DATOS REALES SIMULADOS</span>
+        </div>
+        <div style="flex-grow:1; position:relative; min-height:240px;">
+          <canvas id="radarChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="padding:0; overflow:hidden;">
+      <div class="map-layer-selector">
+        <button class="btn-map-mode active" id="mm-agents" onclick="setMapVisualizationMode('agents')">🚗 Personas / Autos</button>
+        <button class="btn-map-mode" id="mm-agent-heat" onclick="setMapVisualizationMode('agent_heat')">👥 Calor Personas</button>
+        <button class="btn-map-mode" id="mm-slow-heat" onclick="setMapVisualizationMode('slow_heat')">🚦 Tráfico Lento (Actual)</button>
+      </div>
+
+      <div class="map-legend-box" id="map-legend-box"></div>
+      <div id="map"></div>
+    </div>
+  </div>
+
+  <script>
+    let activeScenario = 1;
+    let phaseMode = "arribo";
+    let stadiumCapacity = 40000;
+    let mapVisMode = "agents";
+
+    let executedScenarioHistory = {
+      "A_Arribo": null, "A_Desalojo": null,
+      "B_Arribo": null, "B_Desalojo": null
+    };
+
+    // MAPA CON PERSPECTIVA 3D Y ROTACIÓN LIGERAMENTE AUMENTADA (-35°)
+    const map = new maplibregl.Map({
+      container: 'map',
+      style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+      center: [-103.3810, 20.7350],
+      zoom: 15.2,
+      pitch: 55,
+      bearing: -35, // ROTACIÓN LIGERA 3D APLICADA
+      antialias: true
+    });
+
+    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
+
+    let parkingMarkersMap = new Map();
+
+    map.on('load', () => {
+      const layers = map.getStyle().layers;
+      let labelLayerId;
+      for (let i = 0; i < layers.length; i++) {
+        if (layers[i].type === 'symbol' && layers[i].layout && layers[i].layout['text-field']) {
+          labelLayerId = layers[i].id;
+          break;
+        }
+      }
+
+      if (map.getSource('openmaptiles')) {
+        map.addLayer({
+          'id': '3d-buildings',
+          'source': 'openmaptiles',
+          'source-layer': 'building',
+          'type': 'fill-extrusion',
+          'minzoom': 13,
+          'paint': {
+            'fill-extrusion-color': '#0b1329',
+            'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 14],
+            'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0],
+            'fill-extrusion-opacity': 0.75
+          }
+        }, labelLayerId);
+      }
+
+      map.addSource('agents-source', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addSource('slow-heat-source', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+
+      map.addLayer({
+        'id': 'agents-layer',
+        'type': 'circle',
+        'source': 'agents-source',
+        'layout': { 'visibility': 'visible' },
+        'paint': {
+          'circle-radius': ['match', ['get', 'type'], 'car', 4.5, 'macro', 5, 'l3', 5, 3.5],
+          'circle-color': [
+            'match', ['get', 'type'],
+            'car', '#ff9900',
+            'macro', '#00ff9d',
+            'l3', '#3399ff',
+            '#00e5ff'
+          ],
+          'circle-stroke-width': 1,
+          'circle-stroke-color': '#ffffff',
+          'circle-opacity': 0.9
+        }
+      });
+
+      map.addLayer({
+        'id': 'agent-heat-layer',
+        'type': 'heatmap',
+        'source': 'agents-source',
+        'layout': { 'visibility': 'none' },
+        'paint': {
+          'heatmap-weight': 1,
+          'heatmap-intensity': 1.2,
+          'heatmap-color': [
+            'interpolate', ['linear'], ['heatmap-density'],
+            0, 'rgba(0,0,0,0)',
+            0.2, '#002244',
+            0.4, '#00ff9d',
+            0.6, '#ffff00',
+            0.8, '#ff9900',
+            1.0, '#ff3366'
+          ],
+          'heatmap-radius': 22,
+          'heatmap-opacity': 0.85
+        }
+      });
+
+      map.addLayer({
+        'id': 'slow-heat-layer',
+        'type': 'heatmap',
+        'source': 'slow-heat-source',
+        'layout': { 'visibility': 'none' },
+        'paint': {
+          'heatmap-weight': ['coalesce', ['get', 'congestion'], 1],
+          'heatmap-intensity': 1.3,
+          'heatmap-color': [
+            'interpolate', ['linear'], ['heatmap-density'],
+            0, 'rgba(0,0,0,0)',
+            0.2, '#002244',
+            0.4, '#00ff9d',
+            0.6, '#ffff00',
+            0.8, '#ff9900',
+            1.0, '#ff3366'
+          ],
+          'heatmap-radius': 25,
+          'heatmap-opacity': 0.88
+        }
+      });
+    });
+
+    const ctx = document.getElementById('radarChart').getContext('2d');
+    const radarChart = new Chart(ctx, {
+      type: 'radar',
+      data: {
+        labels: [
+          'Fluidez Vial', 
+          'Nivel Servicio (LOS)', 
+          'Transp. Público', 
+          'Movilidad Activa', 
+          'Margen Parking', 
+          'Eco Score'
+        ],
+        datasets: [
+          {
+            label: 'A: Arribo (19h)',
+            data: [null, null, null, null, null, null],
+            borderColor: '#ff3366',
+            backgroundColor: 'rgba(255, 51, 102, 0.15)',
+            borderWidth: 2.5,
+            pointBackgroundColor: '#ff3366',
+            pointRadius: 4
+          },
+          {
+            label: 'A: Desalojo (23h)',
+            data: [null, null, null, null, null, null],
+            borderColor: '#ff9900',
+            backgroundColor: 'rgba(255, 153, 0, 0.15)',
+            borderWidth: 2.5,
+            borderDash: [4, 4],
+            pointBackgroundColor: '#ff9900',
+            pointRadius: 4
+          },
+          {
+            label: 'B: Arribo (19h)',
+            data: [null, null, null, null, null, null],
+            borderColor: '#00ff9d',
+            backgroundColor: 'rgba(0, 255, 157, 0.18)',
+            borderWidth: 3,
+            pointBackgroundColor: '#00ff9d',
+            pointRadius: 5
+          },
+          {
+            label: 'B: Desalojo (23h)',
+            data: [null, null, null, null, null, null],
+            borderColor: '#00e5ff',
+            backgroundColor: 'rgba(0, 229, 255, 0.15)',
+            borderWidth: 2.5,
+            borderDash: [4, 4],
+            pointBackgroundColor: '#00e5ff',
+            pointRadius: 4
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          r: {
+            min: 0,
+            max: 100,
+            angleLines: { color: 'rgba(255, 255, 255, 0.18)' },
+            grid: { color: 'rgba(255, 255, 255, 0.18)' },
+            pointLabels: { 
+              color: '#00e5ff', 
+              font: { family: 'Space Mono', size: 12, weight: 'bold' } 
+            },
+            ticks: { display: false }
+          }
+        },
+        plugins: { 
+          legend: { 
+            display: true,
+            position: 'bottom',
+            labels: {
+              color: '#e4e4e7',
+              font: { family: 'Space Mono', size: 10.5, weight: 'bold' },
+              boxWidth: 12,
+              padding: 8
+            }
+          } 
+        }
+      }
+    });
+
+    function updateMapLegend() {
+      const legendBox = document.getElementById('map-legend-box');
+
+      if (mapVisMode === 'agents') {
+        legendBox.innerHTML = `
+          <div class="legend-title">🚗 Modos de Transporte</div>
+          <div class="legend-item"><div class="legend-color-dot" style="background:#ff9900;"></div><span>Coche Particular</span></div>
+          <div class="legend-item"><div class="legend-color-dot" style="background:#00ff9d;"></div><span>Mi Macro (BRT)</span></div>
+          <div class="legend-item"><div class="legend-color-dot" style="background:#3399ff;"></div><span>Línea 3 Tren</span></div>
+          <div class="legend-item"><div class="legend-color-dot" style="background:#00e5ff;"></div><span>Peatón / Bici</span></div>
+        `;
+      } else if (mapVisMode === 'agent_heat') {
+        legendBox.innerHTML = `
+          <div class="legend-title">👥 Densidad Personas</div>
+          <div>Concentración Poblacional</div>
+          <div class="legend-gradient-bar"></div>
+          <div class="legend-scale-labels"><span>Baja</span><span>Media</span><span>Alta</span></div>
+        `;
+      } else if (mapVisMode === 'slow_heat') {
+        legendBox.innerHTML = `
+          <div class="legend-title">🚦 Tráfico Lento (Actual)</div>
+          <div>Severidad de Retraso Vial</div>
+          <div class="legend-gradient-bar"></div>
+          <div class="legend-scale-labels"><span>Fluido (&gt;25 km/h)</span><span>Lento (&lt;10 km/h)</span></div>
+        `;
+      }
+    }
+
+    let isSyncing = false;
+
+    async function syncWithGama() {
+      if (isSyncing) return;
+      isSyncing = true;
+
+      const candidatePaths = ['/includes/data/emissions_data.json', '../includes/data/emissions_data.json', 'includes/data/emissions_data.json', 'emissions_data.json'];
+
+      for (const path of candidatePaths) {
+        try {
+          const res = await fetch(path + '?t=' + Date.now());
+          if (res.ok) {
+            const rawText = await res.text();
+            let emData = JSON.parse(rawText);
+            if (typeof emData === 'string') emData = JSON.parse(emData);
+            if (Array.isArray(emData) && emData.length > 0) emData = typeof emData[0] === 'string' ? JSON.parse(emData[0]) : emData[0];
+
+            if (emData) {
+              if (emData.simulated_time) {
+                document.getElementById('simulated-clock-val').innerText = emData.simulated_time;
+              }
+
+              if (emData.phase_mode && emData.phase_mode !== phaseMode) {
+                phaseMode = emData.phase_mode;
+                updatePhaseUI();
+              }
+
+              let currentSpeed = parseFloat(emData.avg_speed || 0).toFixed(1);
+              document.getElementById('kpi-speed-val').innerText = `${currentSpeed} km/h`;
+              
+              const speedBadge = document.getElementById('kpi-speed-badge');
+              const spdNum = parseFloat(currentSpeed);
+              if (spdNum < 10) {
+                speedBadge.innerText = 'Congestión Crítica';
+                speedBadge.className = 'badge bg-danger';
+              } else if (spdNum < 25) {
+                speedBadge.innerText = 'Tráfico Lento';
+                speedBadge.className = 'badge bg-warning';
+              } else {
+                speedBadge.innerText = 'Flujo Fluido';
+                speedBadge.className = 'badge bg-success';
+              }
+
+              let delayVal = parseFloat(emData.delay_factor || 1.0).toFixed(1);
+              document.getElementById('kpi-delay-val').innerText = `${delayVal}x`;
+              
+              const delayBadge = document.getElementById('kpi-delay-badge');
+              const delayNum = parseFloat(delayVal);
+              if (delayNum >= 3.0) {
+                delayBadge.innerText = 'LOS F (Demora Severa)';
+                delayBadge.className = 'badge bg-danger';
+              } else if (delayNum >= 1.8) {
+                delayBadge.innerText = 'LOS C-D (Demora Moderada)';
+                delayBadge.className = 'badge bg-warning';
+              } else {
+                delayBadge.innerText = 'LOS A-B (Flujo Libre)';
+                delayBadge.className = 'badge bg-success';
+              }
+
+              const parkPct = Math.round(emData.parking_occupancy_pct || 0);
+              document.getElementById('kpi-parking-val').innerText = `${parkPct}%`;
+              document.getElementById('kpi-parking-badge').innerText = `${emData.total_parking_occupied || 0} / ${emData.total_parking_capacity || 0} Cajones`;
+
+              const arrived = emData.stadium_arrived || 0;
+              const enRoute = emData.stadium_en_route || 0;
+              
+              document.getElementById('kpi-arrived-val').innerText = `${arrived.toLocaleString()} / ${(stadiumCapacity/1000).toFixed(0)}k`;
+              
+              if (phaseMode === 'arribo') {
+                document.getElementById('kpi-people-badge').innerText = `${enRoute.toLocaleString()} en camino`;
+                document.getElementById('kpi-people-badge').className = 'badge bg-warning';
+              } else {
+                document.getElementById('kpi-people-badge').innerText = `En Recinto`;
+                document.getElementById('kpi-people-badge').className = 'badge bg-info';
+              }
+
+              const scId = emData.active_scenario || activeScenario;
+              if (scId === 1) {
+                document.getElementById('kpi-strategy-val').innerText = 'Escenario A';
+                document.getElementById('kpi-strategy-badge').innerText = 'Base Vehicular';
+                document.getElementById('kpi-strategy-badge').className = 'badge bg-danger';
+              } else {
+                document.getElementById('kpi-strategy-val').innerText = 'Escenario B';
+                document.getElementById('kpi-strategy-badge').innerText = 'Plan Intermodal';
+                document.getElementById('kpi-strategy-badge').className = 'badge bg-success';
+              }
+
+              // ACTUALIZACIÓN CONTINUA DE ESTACIONAMIENTOS CON TOOLTIPS EN HOVER
+              if (emData.parking_lots && Array.isArray(emData.parking_lots)) {
+                const currentLotNames = emData.parking_lots.map(l => l.name);
+
+                for (let [name, item] of parkingMarkersMap.entries()) {
+                  if (!currentLotNames.includes(name)) {
+                    item.marker.remove();
+                    parkingMarkersMap.delete(name);
+                  }
+                }
+
+                emData.parking_lots.forEach(lot => {
+                  let bgAlpha = 'rgba(0, 255, 157, 0.90)';
+                  if (lot.pct > 85) { bgAlpha = 'rgba(255, 51, 102, 0.90)'; }
+                  else if (lot.pct > 60) { bgAlpha = 'rgba(255, 153, 0, 0.90)'; }
+
+                  const popupHtml = `
+                    <div style="font-family: var(--font-mono);">
+                      <strong>${lot.name}</strong><br/>
+                      <span>Ocupación: <strong>${lot.occupied} / ${lot.capacity}</strong> (${lot.pct}%)</span>
+                    </div>
+                  `;
+
+                  if (parkingMarkersMap.has(lot.name)) {
+                    const item = parkingMarkersMap.get(lot.name);
+                    item.el.style.background = bgAlpha;
+                    item.el.innerHTML = `🅿️ ${lot.pct}%`;
+                    item.popup.setHTML(popupHtml);
+                  } else if (lot.lat && lot.lng) {
+                    const el = document.createElement('div');
+                    el.className = 'parking-pin-badge';
+                    el.style.background = bgAlpha;
+                    el.innerHTML = `🅿️ ${lot.pct}%`;
+
+                    const popup = new maplibregl.Popup({ 
+                      offset: 12, 
+                      closeButton: false, 
+                      closeOnClick: false 
+                    }).setHTML(popupHtml);
+
+                    const marker = new maplibregl.Marker({ element: el })
+                      .setLngLat([lot.lng, lot.lat])
+                      .addTo(map);
+
+                    el.addEventListener('mouseenter', () => {
+                      popup.setLngLat([lot.lng, lot.lat]).addTo(map);
+                    });
+                    el.addEventListener('mouseleave', () => {
+                      popup.remove();
+                    });
+
+                    parkingMarkersMap.set(lot.name, { marker, popup, el });
+                  }
+                });
+              }
+
+              if (emData.modal_split) {
+                const ms = emData.modal_split;
+                const car = ms.car || 0, macro = ms.macro || 0, l3 = ms.l3 || 0, bike = ms.bike || 0, walk = ms.walk || 0;
+                const tot = Math.max(1, car + macro + l3 + bike + walk);
+
+                document.getElementById('m-car-cnt').innerText = car; document.getElementById('m-car-pct').innerText = `${Math.round((car/tot)*100)}%`;
+                document.getElementById('m-macro-cnt').innerText = macro; document.getElementById('m-macro-pct').innerText = `${Math.round((macro/tot)*100)}%`;
+                document.getElementById('m-l3-cnt').innerText = l3; document.getElementById('m-l3-pct').innerText = `${Math.round((l3/tot)*100)}%`;
+                document.getElementById('m-bike-cnt').innerText = bike; document.getElementById('m-bike-pct').innerText = `${Math.round((bike/tot)*100)}%`;
+                document.getElementById('m-walk-cnt').innerText = walk; document.getElementById('m-walk-pct').innerText = `${Math.round((walk/tot)*100)}%`;
+              }
+
+              // PERSISTENCIA EN RADIAL
+              if (emData.active_metrics && emData.active_metrics.key && emData.active_metrics.data) {
+                const k = emData.active_metrics.key;
+                executedScenarioHistory[k] = emData.active_metrics.data;
+
+                if (executedScenarioHistory["A_Arribo"]) radarChart.data.datasets[0].data = executedScenarioHistory["A_Arribo"];
+                if (executedScenarioHistory["A_Desalojo"]) radarChart.data.datasets[1].data = executedScenarioHistory["A_Desalojo"];
+                if (executedScenarioHistory["B_Arribo"]) radarChart.data.datasets[2].data = executedScenarioHistory["B_Arribo"];
+                if (executedScenarioHistory["B_Desalojo"]) radarChart.data.datasets[3].data = executedScenarioHistory["B_Desalojo"];
+
+                radarChart.update('none');
+              }
+
+              // ACTUALIZACIÓN SELECTIVA DE CAPAS
+              if (map.isStyleLoaded()) {
+                if ((mapVisMode === 'agents' || mapVisMode === 'agent_heat') && map.getSource('agents-source') && emData.agents) {
+                  const agentFeatures = emData.agents.map(ag => ({
+                    type: 'Feature',
+                    geometry: { type: 'Point', coordinates: [parseFloat(ag.lng), parseFloat(ag.lat)] },
+                    properties: { type: ag.type }
+                  }));
+                  map.getSource('agents-source').setData({ type: 'FeatureCollection', features: agentFeatures });
+                }
+
+                if (mapVisMode === 'slow_heat' && map.getSource('slow-heat-source') && emData.points) {
+                  const slowFeatures = emData.points.map(pt => ({
+                    type: 'Feature',
+                    geometry: { type: 'Point', coordinates: [parseFloat(pt.lng), parseFloat(pt.lat)] },
+                    properties: { congestion: Math.min(1.0, parseFloat(pt.congestion || 0.4)) }
+                  }));
+                  map.getSource('slow-heat-source').setData({ type: 'FeatureCollection', features: slowFeatures });
+                }
+              }
+
+              break;
+            }
+          }
+        } catch (e) {}
+      }
+      isSyncing = false;
+    }
+
+    function setMapVisualizationMode(mode) {
+      mapVisMode = mode;
+      
+      document.querySelectorAll('.btn-map-mode').forEach(btn => btn.classList.remove('active'));
+      const targetId = `mm-${mode.replace(/_/g, '-')}`;
+      const activeBtn = document.getElementById(targetId);
+      if (activeBtn) activeBtn.classList.add('active');
+
+      updateMapLegend();
+
+      if (map.isStyleLoaded()) {
+        map.setLayoutProperty('agents-layer', 'visibility', mode === 'agents' ? 'visible' : 'none');
+        map.setLayoutProperty('agent-heat-layer', 'visibility', mode === 'agent_heat' ? 'visible' : 'none');
+        map.setLayoutProperty('slow-heat-layer', 'visibility', mode === 'slow_heat' ? 'visible' : 'none');
+      }
+
+      syncWithGama();
+    }
+
+    function updatePhaseUI() {
+      const btnArribo = document.getElementById('btn-mode-arribo');
+      const btnDesalojo = document.getElementById('btn-mode-desalojo');
+      const lblPeople = document.getElementById('kpi-people-label');
+      const modalTitle = document.getElementById('modal-split-title');
+
+      if (phaseMode === 'arribo') {
+        btnArribo.className = 'btn-phase active-arribo';
+        btnDesalojo.className = 'btn-phase';
+        lblPeople.innerText = 'Personas en Recinto';
+        modalTitle.innerText = 'DESGLOSE DE ARRIBO AL ESTADIO POR MODO';
+      } else {
+        btnArribo.className = 'btn-phase';
+        btnDesalojo.className = 'btn-phase active-desalojo';
+        lblPeople.innerText = 'Aforo Restante Estadio';
+        modalTitle.innerText = 'DESGLOSE DE EVACUACIÓN POR MODO';
+      }
+    }
+
+    async function sendControlCommand(extraData = {}) {
+      await fetch('/api/control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active_scenario: activeScenario, phase_mode: phaseMode, stadium_capacity: stadiumCapacity, updated: true, ...extraData })
+      });
+    }
+
+    function setPhaseMode(pm) {
+      if (phaseMode !== pm) {
+        phaseMode = pm;
+        updatePhaseUI();
+        sendControlCommand({ reset: true });
+      }
+    }
+
+    function setScenario(sc) {
+      if (activeScenario !== sc) {
+        activeScenario = sc;
+        document.getElementById('btn-sc1').classList.toggle('active', sc === 1);
+        document.getElementById('btn-sc2').classList.toggle('active', sc === 2);
+        sendControlCommand({ reset: true });
+      }
+    }
+
+    function resetSimulation() { 
+      sendControlCommand({ reset: true }); 
+    }
+
+    window.addEventListener('load', () => {
+      updateMapLegend();
+      resetSimulation();
+      syncWithGama();
+      setInterval(syncWithGama, 250);
+    });
+  </script>
+</body>
+</html>
